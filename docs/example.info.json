@@ -1,0 +1,27 @@
+{
+  "title": "Mein Beispiel-Video",
+  "description": "Dies ist eine ausführliche Beschreibung meines Videos.\n\nHier können mehrere Absätze stehen.\n\nWeitere Informationen und Links können hier eingefügt werden.",
+  "tags": [
+    "tutorial",
+    "beispiel",
+    "youtube",
+    "upload"
+  ],
+  "category": "22",
+  "language": "de",
+  "chapters": [
+    {
+      "time": "0:00",
+      "title": "Einleitung"
+    },
+    {
+      "time": "1:30",
+      "title": "Hauptteil"
+    },
+    {
+      "time": "5:45",
+      "title": "Zusammenfassung"
+    }
+  ],
+  "thumbnail": "/pfad/zu/thumbnail.jpg"
+}

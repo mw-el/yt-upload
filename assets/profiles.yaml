@@ -1,0 +1,47 @@
+# YouTube Upload-Profile
+# Definiert verschiedene Upload-Konfigurationen mit detaillierten Beschreibungen
+
+neutral_embed:
+  description: |
+    Unlisted, embeddable, neutrales Branding (modestbranding=1, rel=0, playsinline=1).
+    Ideal für Website-Wrapper ohne YouTube-Ablenkung.
+  status:
+    privacyStatus: "unlisted"
+    embeddable: true
+  snippet:
+    categoryId: "22"
+  embed_params:
+    modestbranding: "1"
+    rel: "0"
+    controls: "1"
+    playsinline: "1"
+
+public_youtube:
+  description: |
+    Öffentliche Version für maximale Sichtbarkeit und SEO.
+    Verwendet externe Untertitel, Kapitel in der Description.
+  status:
+    privacyStatus: "public"
+    embeddable: true
+  snippet:
+    categoryId: "22"
+  embed_params:
+    modestbranding: "1"
+    rel: "0"
+    controls: "1"
+    playsinline: "1"
+
+social_subtitled:
+  description: |
+    Private Variante mit eingebrannten Untertiteln.
+    Ideal für Social-Media-Veröffentlichungen ausserhalb YouTube.
+  status:
+    privacyStatus: "private"
+    embeddable: true
+  snippet:
+    categoryId: "22"
+  embed_params:
+    modestbranding: "1"
+    rel: "0"
+    controls: "1"
+    playsinline: "1"
