@@ -17,6 +17,7 @@ Minimalistische Desktop-App für automatisierte YouTube-Uploads mit präfix-basi
 - **Profil-basierte Uploads**: Vordefinierte Profile mit Requirements (SRT, JSON)
 - **Profil-Präferenzen**: Speichert letzte Profil-Auswahl pro Video
 - **JSON-Schema-Validierung**: Prüft Metadaten vor Upload
+- **Asset-Manager**: Übersicht über bereits hochgeladene Videos inkl. Statistiken
 - **Moderne GUI**: ttkbootstrap mit Ubuntu-Font, responsives Layout
 - **Fail Fast**: Klare Fehlermeldungen bei Problemen
 
@@ -217,6 +218,13 @@ my_video.mp4
 ↻ neutral_embed: Läuft...
 ● public_youtube: abc12345...
 ```
+
+### Assets einsehen und verwalten
+
+- Klicke auf **📚 Assets** (rechts neben den Favoriten), um ein zusätzliches Fenster mit allen bereits hochgeladenen Videos zu öffnen.
+- Die Liste zeigt Thumbnail, Titel, Upload-Datum, Sichtbarkeit und Aufrufe; über **Details** erhältst du weitere Metadaten und Statistiken.
+- Buttons erlauben den direkten Sprung zum Video bzw. zu YouTube Studio; ein Kopier-Button legt die Video-URL in die Zwischenablage.
+- Die Daten kommen live aus der YouTube Data API – mit **Aktualisieren** aktualisierst du die Übersicht jederzeit.
 
 ---
 

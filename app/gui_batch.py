@@ -45,6 +45,7 @@ from app.favorites import (
     load_profile_preferences,
     save_profile_preferences
 )
+from app.asset_manager import AssetManagerWindow
 from app.companion import (
     check_ffmpeg_available,
     find_subtitle_streams,
@@ -223,6 +224,7 @@ class BatchUploadApp:
         self.auth_check_running = False
         self.batch_progress = {"current": 0, "total": 0, "success": 0, "failure": 0}
         self.last_directory_selection = str(Path.home())
+        self.asset_window = None
 
         # Lade Profile & Favoriten
         self._load_profiles()
@@ -339,6 +341,13 @@ class BatchUploadApp:
             text="× Liste leeren",
             command=self._clear_videos,
             bootstyle=SECONDARY
+        ).pack(side=LEFT, padx=5)
+
+        ttk.Button(
+            global_controls,
+            text="📚 Assets",
+            command=self._open_asset_manager,
+            bootstyle=INFO
         ).pack(side=LEFT, padx=5)
 
     def _create_video_info_bar(self, parent):
@@ -710,6 +719,14 @@ class BatchUploadApp:
         """Aktualisiert globale Statusanzeige."""
         if hasattr(self, "status_label"):
             self.status_label.config(text=text, foreground=color)
+
+    def _open_asset_manager(self):
+        """Öffnet separates Fenster mit bereits hochgeladenen Videos."""
+        if self.asset_window and self.asset_window.winfo_exists():
+            self.asset_window.lift()
+            return
+
+        self.asset_window = AssetManagerWindow(self)
 
     def _add_videos_from_dir(self, start_dir: str):
         """Öffnet Datei-Dialog mit vorgegebenem Startverzeichnis."""
