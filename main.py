@@ -7,7 +7,7 @@ Fail Fast: Bricht sofort ab, wenn nicht im korrekten Environment.
 """
 
 from app.config import check_environment
-from app.gui import run_app
+from app.gui_batch import run_app
 
 
 def main():

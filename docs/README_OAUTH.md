@@ -121,7 +121,14 @@ mv ~/Downloads/client_secret_*.json ~/.config/yt-upload/client_secrets.json
 
 ⚠️ **Wichtig:** Die Datei MUSS `client_secrets.json` heißen!
 
-### Option B: Eigener Pfad mit .env
+### Option B: Repo-lokaler Pfad (automatisch erkannt)
+
+```bash
+mkdir -p .config
+mv ~/Downloads/client_secret_*.json .config/client_secrets.json
+```
+
+### Option C: Eigener Pfad mit .env
 
 Falls du einen anderen Pfad verwenden möchtest:
 
@@ -196,8 +203,9 @@ conda activate yt-upload
 
 **Lösung:**
 ```bash
-# Prüfe Pfad
+# Prüfe Pfade
 ls -la ~/.config/yt-upload/client_secrets.json
+ls -la .config/client_secrets.json
 
 # Falls nicht vorhanden: Datei korrekt platzieren
 mv ~/Downloads/client_secret_*.json ~/.config/yt-upload/client_secrets.json

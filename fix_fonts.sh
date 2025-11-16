@@ -8,8 +8,13 @@ echo "Font-Rendering-Fix für YouTube Upload Tool"
 echo "================================================"
 echo ""
 
+# Aktiviere yt-upload Environment
+CONDA_BASE=$(conda info --base)
+source "$CONDA_BASE/etc/profile.d/conda.sh"
+conda activate yt-upload
+
 # 1. Installiere Tk mit XFT-Support
-echo "1. Installiere Tk mit XFT-Support..."
+echo "1. Installiere Tk mit XFT-Support im yt-upload Environment..."
 conda install -c conda-forge "tk=8.6.13=xft*" -y
 
 echo ""

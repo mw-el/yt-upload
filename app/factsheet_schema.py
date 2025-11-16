@@ -7,47 +7,87 @@ import json
 from jsonschema import validate, ValidationError
 from typing import Dict, Any
 
-# JSON-Schema für Factsheet-Dateien
+# JSON-Schema für Factsheet-Dateien (*_yt_profile.json)
 FACTSHEET_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
-    "required": ["title", "description"],
+    "required": ["snippet", "status"],
     "properties": {
-        "title": {
+        "source_file": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 100,
-            "description": "Videotitel (max. 100 Zeichen)"
-        },
-        "description": {
-            "type": "string",
-            "description": "Videobeschreibung"
-        },
-        "tags": {
-            "type": "array",
-            "items": {"type": "string"},
-            "maxItems": 500,
-            "description": "Video-Tags (max. 500)"
-        },
-        "category": {
-            "type": "string",
-            "description": "Kategorie-ID (z.B. '22' für People & Blogs)"
+            "description": "Basis-Dateiname (ohne Erweiterung)"
         },
         "language": {
             "type": "string",
-            "pattern": "^[a-z]{2}$",
-            "description": "Sprache (ISO 639-1, z.B. 'de', 'en')"
+            "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+            "description": "Sprache (ISO 639-1, z.B. 'de', 'de-CH')"
+        },
+        "snippet": {
+            "type": "object",
+            "required": ["title"],
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "description": "Videotitel (max. 100 Zeichen)"
+                },
+                "description_short": {
+                    "type": "string",
+                    "description": "Kurze Beschreibung (2 Sätze)"
+                },
+                "description_bullets": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Bullet-Points für Beschreibung"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "maxItems": 500,
+                    "description": "Video-Tags (max. 500)"
+                },
+                "hashtags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Hashtags (mit #)"
+                },
+                "categoryId": {
+                    "type": "string",
+                    "description": "Kategorie-ID (z.B. '22' für People & Blogs)"
+                }
+            }
+        },
+        "status": {
+            "type": "object",
+            "properties": {
+                "privacyStatus": {
+                    "type": "string",
+                    "enum": ["public", "private", "unlisted"],
+                    "description": "Sichtbarkeit"
+                },
+                "embeddable": {
+                    "type": "boolean"
+                },
+                "publishAt": {
+                    "type": ["string", "null"],
+                    "description": "Zeitpunkt für Veröffentlichung (ISO 8601)"
+                },
+                "madeForKids": {
+                    "type": "boolean"
+                }
+            }
         },
         "chapters": {
             "type": "array",
             "items": {
                 "type": "object",
-                "required": ["time", "title"],
+                "required": ["timecode", "title"],
                 "properties": {
-                    "time": {
+                    "timecode": {
                         "type": "string",
                         "pattern": "^\\d{1,2}:\\d{2}(:\\d{2})?$",
-                        "description": "Zeitstempel (z.B. '0:00' oder '1:23:45')"
+                        "description": "Zeitstempel (z.B. '00:00' oder '01:23:45')"
                     },
                     "title": {
                         "type": "string",
@@ -58,9 +98,54 @@ FACTSHEET_SCHEMA = {
             },
             "description": "Video-Kapitel"
         },
+        "captions": {
+            "type": "object",
+            "properties": {
+                "file": {
+                    "type": ["string", "null"],
+                    "description": "Pfad zur SRT-Datei"
+                },
+                "language": {
+                    "type": "string"
+                }
+            }
+        },
         "thumbnail": {
+            "type": "object",
+            "properties": {
+                "file": {
+                    "type": ["string", "null"],
+                    "description": "Pfad zum Thumbnail"
+                },
+                "autogenerate_if_missing": {
+                    "type": "boolean"
+                },
+                "autogenerate_frame_sec": {
+                    "type": "number"
+                }
+            }
+        },
+        "embed_params": {
+            "type": "object",
+            "description": "YouTube-Embed-Parameter"
+        },
+        "playlist": {
+            "type": "object",
+            "properties": {
+                "create_if_missing": {
+                    "type": "boolean"
+                },
+                "title": {
+                    "type": ["string", "null"]
+                },
+                "id": {
+                    "type": ["string", "null"]
+                }
+            }
+        },
+        "notes": {
             "type": "string",
-            "description": "Pfad zum Thumbnail-Bild (optional)"
+            "description": "Interne Notizen"
         }
     },
     "additionalProperties": True

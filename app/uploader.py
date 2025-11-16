@@ -4,7 +4,7 @@ Implementiert Video-, Untertitel- und Thumbnail-Upload zu YouTube.
 """
 
 import os
-from typing import Dict, Any, Tuple, Optional, Callable
+from typing import Dict, Any, Tuple, Optional, Callable, List
 from pathlib import Path
 
 from googleapiclient.http import MediaFileUpload
@@ -60,36 +60,71 @@ def _prepare_video_metadata(
     Returns:
         Dictionary mit YouTube-konformen Metadaten
     """
-    # Basis-Snippet aus Factsheet
+    snippet_source = factsheet_data.get('snippet') or {}
+    legacy_title = factsheet_data.get('title')
+    title = snippet_source.get('title') or legacy_title
+
+    if not title:
+        raise UploadError("Factsheet enthält keinen Titel (snippet.title).")
+
+    description_parts: List[str] = []
+    if snippet_source.get('description_short'):
+        description_parts.append(snippet_source['description_short'].strip())
+
+    bullets = snippet_source.get('description_bullets') or []
+    bullet_lines = [f"- {item.strip()}" for item in bullets if isinstance(item, str) and item.strip()]
+    if bullet_lines:
+        description_parts.append("\n".join(bullet_lines))
+
+    if snippet_source.get('description'):
+        description_parts.append(snippet_source['description'].strip())
+    elif factsheet_data.get('description'):
+        description_parts.append(str(factsheet_data['description']).strip())
+
+    hashtags = snippet_source.get('hashtags') or []
+    hashtag_line = " ".join(tag.strip() for tag in hashtags if isinstance(tag, str) and tag.strip())
+    if hashtag_line:
+        description_parts.append(hashtag_line)
+
+    description = "\n\n".join(part for part in description_parts if part).strip()
+    if not description:
+        description = title
+
     snippet = {
-        'title': factsheet_data['title'],
-        'description': factsheet_data.get('description', ''),
+        'title': title,
+        'description': description
     }
 
-    # Tags hinzufügen (falls vorhanden)
-    if 'tags' in factsheet_data and factsheet_data['tags']:
-        snippet['tags'] = factsheet_data['tags']
+    tags = snippet_source.get('tags') or factsheet_data.get('tags')
+    if tags:
+        snippet['tags'] = tags
 
-    # Kategorie aus Profil oder Factsheet
-    category_id = profile_data.get('snippet', {}).get('categoryId')
-    if not category_id and 'category' in factsheet_data:
-        category_id = factsheet_data['category']
+    category_id = (
+        snippet_source.get('categoryId')
+        or profile_data.get('snippet', {}).get('categoryId')
+        or factsheet_data.get('categoryId')
+        or factsheet_data.get('category')
+    )
     if category_id:
         snippet['categoryId'] = str(category_id)
 
-    # Sprache (falls vorhanden)
-    if 'language' in factsheet_data:
-        snippet['defaultLanguage'] = factsheet_data['language']
+    language = factsheet_data.get('language')
+    if language:
+        snippet['defaultLanguage'] = language
+        snippet['defaultAudioLanguage'] = language
 
-    # Kapitel in Description einfügen (falls vorhanden)
-    if 'chapters' in factsheet_data and factsheet_data['chapters']:
+    if factsheet_data.get('chapters'):
         chapters_text = "\n\n⏱ Kapitel:\n"
         for chapter in factsheet_data['chapters']:
-            chapters_text += f"{chapter['time']} - {chapter['title']}\n"
-        snippet['description'] += chapters_text
+            timecode = chapter.get('timecode') or chapter.get('time')
+            chapter_title = chapter.get('title')
+            if timecode and chapter_title:
+                chapters_text += f"{timecode} - {chapter_title}\n"
+        snippet['description'] = (snippet['description'] + chapters_text).strip()
 
-    # Status aus Profil
-    status = profile_data.get('status', {})
+    status = {}
+    status.update(factsheet_data.get('status', {}))
+    status.update(profile_data.get('status', {}))
 
     # Kombiniere alles
     body = {
@@ -105,7 +140,8 @@ def upload(
     srt_path: Optional[str],
     factsheet_data: Dict[str, Any],
     profile_data: Dict[str, Any],
-    progress_callback: Optional[Callable[[float], None]] = None
+    progress_callback: Optional[Callable[[float], None]] = None,
+    status_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None
 ) -> UploadResult:
     """
     Lädt Video mit Metadaten und Untertiteln zu YouTube hoch.
@@ -125,13 +161,19 @@ def upload(
         AuthError: Bei Authentifizierungsfehlern
     """
 
+    def emit(event: str, **payload):
+        if status_callback:
+            status_callback(event, payload)
+
     # ===========================
     # 1. Authentifizierung
     # ===========================
     try:
+        emit("auth_start")
         print("🔐 Authentifiziere mit YouTube...")
         youtube = create_youtube_client(CLIENT_SECRETS_PATH, TOKEN_PATH)
         print("✓ Authentifizierung erfolgreich")
+        emit("auth_success")
     except AuthError as e:
         raise UploadError(f"Authentifizierung fehlgeschlagen:\n{str(e)}")
 
@@ -142,11 +184,17 @@ def upload(
     body = _prepare_video_metadata(factsheet_data, profile_data)
     print(f"   Titel: {body['snippet']['title']}")
     print(f"   Status: {body['status'].get('privacyStatus', 'N/A')}")
+    emit(
+        "metadata_ready",
+        title=body['snippet']['title'],
+        status=body['status'].get('privacyStatus')
+    )
 
     # ===========================
     # 3. Video hochladen
     # ===========================
     try:
+        emit("upload_start", filename=Path(video_path).name)
         print(f"📤 Lade Video hoch: {Path(video_path).name}")
 
         # Media-Upload vorbereiten
@@ -180,6 +228,7 @@ def upload(
                     last_progress = progress
 
         video_id = response['id']
+        emit("upload_success", video_id=video_id)
         print(f"✓ Video hochgeladen! ID: {video_id}")
 
     except HttpError as e:
@@ -195,6 +244,7 @@ def upload(
     # ===========================
     if srt_path and Path(srt_path).exists():
         try:
+            emit("captions_start", filename=Path(srt_path).name)
             print(f"📝 Lade Untertitel hoch: {Path(srt_path).name}")
 
             language = factsheet_data.get('language', 'de')
@@ -216,42 +266,64 @@ def upload(
                 media_body=media
             ).execute()
 
+            emit("captions_success", language=language)
             print(f"✓ Untertitel hochgeladen (Sprache: {language})")
 
         except HttpError as e:
+            emit("captions_error", message=str(e))
             print(f"⚠ Warnung: Untertitel konnten nicht hochgeladen werden: {e}")
         except Exception as e:
+            emit("captions_error", message=str(e))
             print(f"⚠ Warnung: Unerwarteter Fehler bei Untertiteln: {e}")
 
     # ===========================
     # 5. Thumbnail hochladen (falls vorhanden)
     # ===========================
-    if 'thumbnail' in factsheet_data:
-        thumbnail_path = factsheet_data['thumbnail']
-        if Path(thumbnail_path).exists():
-            try:
-                print(f"🖼 Lade Thumbnail hoch: {Path(thumbnail_path).name}")
+    thumbnail_config = factsheet_data.get('thumbnail')
+    thumbnail_path = None
+    if isinstance(thumbnail_config, dict):
+        thumbnail_path = thumbnail_config.get('file')
+    else:
+        thumbnail_path = thumbnail_config
 
-                media = MediaFileUpload(thumbnail_path, mimetype='image/jpeg')
+    if thumbnail_path:
+        thumb_file = Path(thumbnail_path)
+        if not thumb_file.is_absolute():
+            thumb_file = Path(video_path).parent / thumb_file
+
+        if thumb_file.exists():
+            try:
+                emit("thumbnail_start", filename=thumb_file.name)
+                print(f"🖼 Lade Thumbnail hoch: {thumb_file.name}")
+
+                media = MediaFileUpload(str(thumb_file), mimetype='image/jpeg')
 
                 youtube.thumbnails().set(
                     videoId=video_id,
                     media_body=media
                 ).execute()
 
+                emit("thumbnail_success")
                 print("✓ Thumbnail hochgeladen")
 
             except HttpError as e:
+                emit("thumbnail_error", message=str(e))
                 print(f"⚠ Warnung: Thumbnail konnte nicht hochgeladen werden: {e}")
             except Exception as e:
+                emit("thumbnail_error", message=str(e))
                 print(f"⚠ Warnung: Unerwarteter Fehler bei Thumbnail: {e}")
 
     # ===========================
     # Erfolgreich abgeschlossen
     # ===========================
+    resolved_title = (
+        factsheet_data.get('snippet', {}).get('title')
+        or factsheet_data.get('title')
+        or 'Unbekannter Titel'
+    )
     return UploadResult(
         video_id=video_id,
-        title=factsheet_data.get('title', 'Unbekannter Titel')
+        title=resolved_title
     )
 
 

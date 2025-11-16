@@ -64,6 +64,11 @@ echo ""
 echo "Starte YouTube Upload Tool..."
 echo ""
 
+# Setze Font-Rendering-Variable
+export TTKBOOTSTRAP_FONT_MANAGER=tk
+# Erzwinge Firefox für OAuth (kann via YOUTUBE_OAUTH_BROWSER überschrieben werden)
+export YOUTUBE_OAUTH_BROWSER="${YOUTUBE_OAUTH_BROWSER:-firefox}"
+
 # Starte die App
 python main.py
 

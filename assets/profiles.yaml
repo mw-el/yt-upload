@@ -5,6 +5,9 @@ neutral_embed:
   description: |
     Unlisted, embeddable, neutrales Branding (modestbranding=1, rel=0, playsinline=1).
     Ideal für Website-Wrapper ohne YouTube-Ablenkung.
+  default_selected: true
+  requires_srt: false
+  requires_json: true
   status:
     privacyStatus: "unlisted"
     embeddable: true
@@ -20,6 +23,9 @@ public_youtube:
   description: |
     Öffentliche Version für maximale Sichtbarkeit und SEO.
     Verwendet externe Untertitel, Kapitel in der Description.
+  default_selected: false
+  requires_srt: true
+  requires_json: true
   status:
     privacyStatus: "public"
     embeddable: true
@@ -35,6 +41,9 @@ social_subtitled:
   description: |
     Private Variante mit eingebrannten Untertiteln.
     Ideal für Social-Media-Veröffentlichungen ausserhalb YouTube.
+  default_selected: false
+  requires_srt: true
+  requires_json: true
   status:
     privacyStatus: "private"
     embeddable: true

@@ -9,10 +9,15 @@ Minimalistische Desktop-App für automatisierte YouTube-Uploads mit präfix-basi
 
 ## Features
 
+- **Multi-Profil-Batch-Upload**: Mehrere Videos mit verschiedenen Profilen gleichzeitig hochladen
+- **Favoriten-Verzeichnisse**: Schnellzugriff auf häufig genutzte Ordner
 - **Automatisches Datei-Matching**: Findet SRT- und JSON-Dateien basierend auf Video-Namenspräfix
-- **Profil-basierte Uploads**: Vordefinierte Profile für verschiedene Upload-Szenarien
+- **Container-SRT-Extraktion**: Extrahiert Untertitel automatisch aus Video-Container (ffmpeg)
+- **Automatische Thumbnail-Generierung**: Erstellt Thumbnail bei t=3s (ffmpeg)
+- **Profil-basierte Uploads**: Vordefinierte Profile mit Requirements (SRT, JSON)
+- **Profil-Präferenzen**: Speichert letzte Profil-Auswahl pro Video
 - **JSON-Schema-Validierung**: Prüft Metadaten vor Upload
-- **Moderne GUI**: ttkbootstrap mit Ubuntu-Font
+- **Moderne GUI**: ttkbootstrap mit Ubuntu-Font, responsives Layout
 - **Fail Fast**: Klare Fehlermeldungen bei Problemen
 
 ---
@@ -59,20 +64,26 @@ python main.py
 ```
 /
 ├── app/                    # Haupt-Anwendungslogik
+│   ├── auth.py             # OAuth2-Authentifizierung
+│   ├── companion.py        # Container-SRT & Thumbnail (ffmpeg)
 │   ├── config.py           # Konfiguration & Environment-Check
-│   ├── gui.py              # Benutzeroberfläche (ttkbootstrap)
+│   ├── favorites.py        # Favoriten-Verzeichnisse & Profil-Präferenzen
+│   ├── gui.py              # Einzelvideo-GUI (Legacy)
+│   ├── gui_batch.py        # Multi-Profil-Batch-GUI (Standard)
 │   ├── matching.py         # Dateisuche (Präfix-basiert)
 │   ├── profiles.py         # Profil-Handling
 │   ├── factsheet_schema.py # JSON-Schema-Validierung
 │   ├── tooltips.py         # Hover-Tooltips
-│   └── uploader.py         # YouTube-Upload (Stub mit TODOs)
+│   └── uploader.py         # YouTube-Upload (vollständig implementiert)
 ├── assets/
-│   └── profiles.yaml       # Upload-Profile
+│   └── profiles.yaml       # Upload-Profile (mit default_selected, requires_*)
 ├── docs/
 │   ├── ARCHITECTURE.md     # Architektur-Dokumentation
-│   └── DEVLOG.md           # Entwicklungsfortschritt
+│   ├── DEVLOG.md           # Entwicklungsfortschritt
+│   └── README_OAUTH.md     # OAuth2-Setup-Anleitung
 ├── start.sh                # Starter-Script (aktiviert Environment automatisch)
-├── main.py                 # Einstiegspunkt (direkter Start)
+├── fix_fonts.sh            # Font-Fix für Ubuntu
+├── main.py                 # Einstiegspunkt (startet Batch-Upload-GUI)
 ├── .env.example            # Environment-Variablen (Vorlage)
 └── README.md               # Diese Datei
 ```
@@ -81,66 +92,131 @@ python main.py
 
 ## Verwendung
 
-### 1. Video auswählen
+### 1. Videos auswählen
 
-Klicke auf **"📹 Video wählen"** und wähle eine Video-Datei (.mp4, .mov, .m4v).
+**Option A: Favoriten-Buttons**
+Klicke auf einen Favoriten-Button (zeigt Verzeichnisnamen wie "Podcasts", "Videos", etc.) → öffnet Datei-Dialog im entsprechenden Verzeichnis.
+
+**Option B: Manuell**
+Klicke auf **"+ Videos hinzufügen"** und navigiere zum Verzeichnis.
+
+**Tipp:** Halte `Strg` gedrückt für Multi-Select oder `Shift` für Bereichsauswahl.
+
+**Favoriten konfigurieren:** Klicke auf ● neben Favorit → wähle neues Verzeichnis. Der Button zeigt automatisch den Namen des ausgewählten Verzeichnisses.
 
 ### 2. Automatisches Matching
 
-Die App sucht automatisch nach passenden Dateien im selben Verzeichnis:
+Die App sucht automatisch nach passenden Dateien im selben Verzeichnis für **jedes** ausgewählte Video:
 
-**Beispiel:**
+**Beispiel (neue Namenskonventionen):**
 ```
-my_video_123.mp4          ← Video
-my_video_123.srt          ← Untertitel (optional)
-my_video_123.info.json    ← Metadaten (erforderlich)
-└───────────┘
-    12 Zeichen Präfix (Standard)
+my-video_podcast_20251103_085932_softsubs.mp4   ← Video mit Container-SRT
+my-video_podcast_20251103_085932_hardsubs.mp4   ← Video mit eingebrannten Untertiteln
+my-video_yt_profile.json                        ← YouTube-Metadaten (WICHTIG!)
+my-video.srt                                    ← Externe SRT (optional)
+sample_MyVideo_20251102_150059.png              ← Thumbnail (bevorzugt)
 ```
 
 **Matching-Logik:**
-- Präfix-Länge: 12 Zeichen (konfigurierbar: 10-15)
-- Fail Fast bei Mehrfachtreffern
+- Sucht `*_yt_profile.json` für Metadaten
+- Sucht `*_softsubs.mp4` / `*_hardsubs.mp4` für Video-Varianten
+- Sucht `*.srt` für externe Untertitel (mit Präfix-Matching)
+- Sucht `sample_*.png` für Thumbnails
+- Bei fehlender SRT: Automatische Extraktion aus softsubs-Video
+- Bei fehlendem Thumbnail: Generierung aus Video bei t=3s
 
-### 3. Metadaten-Format (.info.json)
+### 3. Metadaten-Format (*_yt_profile.json)
+
+**Wichtig:** Dateiname MUSS `*_yt_profile.json` sein!
 
 **Erforderliche Felder:**
 ```json
 {
-  "title": "Mein Video-Titel",
-  "description": "Detaillierte Beschreibung des Videos"
+  "snippet": {
+    "title": "Mein Video-Titel (≤80 Zeichen)"
+  },
+  "status": {
+    "privacyStatus": "unlisted"
+  }
 }
 ```
 
-**Optionale Felder:**
+**Vollständiges Beispiel:**
 ```json
 {
-  "tags": ["tag1", "tag2"],
-  "category": "22",
-  "language": "de",
+  "source_file": "my-video",
+  "language": "de-CH",
+  "snippet": {
+    "title": "Mein Video-Titel",
+    "description_short": "Kurze Beschreibung in 2 Sätzen.",
+    "description_bullets": [
+      "Punkt 1",
+      "Punkt 2"
+    ],
+    "tags": ["tag1", "tag2"],
+    "hashtags": ["#Tag1", "#Tag2"],
+    "categoryId": "22"
+  },
+  "status": {
+    "privacyStatus": "unlisted",
+    "embeddable": true,
+    "madeForKids": false
+  },
   "chapters": [
-    {"time": "0:00", "title": "Intro"},
-    {"time": "1:23", "title": "Hauptteil"}
+    {"timecode": "00:00", "title": "Intro"},
+    {"timecode": "01:23", "title": "Hauptteil"}
   ],
-  "thumbnail": "/path/to/thumbnail.jpg"
+  "captions": {
+    "file": "./my-video.srt",
+    "language": "de-CH"
+  },
+  "thumbnail": {
+    "file": null,
+    "autogenerate_if_missing": true,
+    "autogenerate_frame_sec": 3
+  }
 }
 ```
 
-### 4. Profil wählen
+**Siehe auch:** `docs/PROMPT_YT_METADATA.md` für LLM-Prompt zur Generierung
 
-Wähle ein Upload-Profil aus dem Dropdown:
+### 4. Profile wählen
 
-- **neutral_embed**: Unlisted, für Website-Embedding
-- **public_youtube**: Öffentlich, maximale Sichtbarkeit
-- **social_subtitled**: Privat, für Social-Media-Export
+**Pro Video einzeln:**
+1. Wähle Video in Liste aus
+2. Rechtes Panel zeigt verfügbare Profile mit Checkboxen
+3. Aktiviere gewünschte Profile (mehrere möglich!)
 
-*Fahre mit der Maus über das Dropdown für detaillierte Beschreibungen.*
+**Verfügbare Profile:**
+- **neutral_embed** (Standard): Unlisted, für Website-Embedding
+- **public_youtube**: Öffentlich, benötigt SRT
+- **social_subtitled**: Privat, benötigt SRT
 
-### 5. Upload starten
+Profile mit fehlenden Requirements werden automatisch deaktiviert (z.B. "public_youtube (fehlt: SRT)").
 
-Klicke auf **"🚀 Video hochladen"**.
+**Präferenzen:** Profil-Auswahl wird pro Video-Basename gespeichert und beim nächsten Mal wiederhergestellt.
 
-**Status:** Aktuell ist der Upload ein Stub (Simulation). Siehe TODOs in `app/uploader.py` für Implementierung.
+### 5. Batch-Upload starten
+
+Klicke auf **"▸ Alle hochladen"**.
+
+**Upload-Prozess:**
+- Jedes Video wird für **jedes aktivierte Profil** hochgeladen
+- Sequentielle Verarbeitung (vermeidet API-Limits)
+- Live-Status-Updates pro Video+Profil
+
+**Status-Symbole:**
+- **↻ Profil: Läuft...**: Upload läuft gerade
+- **● Profil: VideoID**: Upload erfolgreich
+- **× Profil: Fehler**: Upload fehlgeschlagen
+- **○ Profil: JSON/SRT fehlt**: Requirements nicht erfüllt
+
+**Beispiel:**
+```
+my_video.mp4
+↻ neutral_embed: Läuft...
+● public_youtube: abc12345...
+```
 
 ---
 
@@ -172,6 +248,7 @@ mein_profil:
 ---
 
 ## OAuth2-Setup (ERFORDERLICH)
+
 
 ### Schritt 1: Google Cloud Console einrichten
 
@@ -216,7 +293,13 @@ mkdir -p ~/.config/yt-upload
 mv ~/Downloads/client_secrets.json ~/.config/yt-upload/
 ```
 
-**Option B: Eigener Pfad mit .env**
+**Option B: Repo-lokaler Pfad (wird automatisch erkannt)**
+```bash
+mkdir -p .config
+mv ~/Downloads/client_secrets.json .config/client_secrets.json
+```
+
+**Option C: Eigener Pfad mit .env**
 ```bash
 cp .env.example .env
 # Bearbeite .env:
@@ -246,7 +329,7 @@ echo "YOUTUBE_CLIENT_SECRETS_PATH=/pfad/zu/deiner/client_secrets.json" >> .env
 ### Troubleshooting OAuth2
 
 **"OAuth2-Credentials nicht gefunden"**
-- Prüfe Pfad: `ls ~/.config/yt-upload/client_secrets.json`
+- Prüfe Pfade: `ls ~/.config/yt-upload/client_secrets.json` **oder** `ls .config/client_secrets.json`
 - Stelle sicher, dass Datei heißt: `client_secrets.json` (nicht `client_secret_...json`)
 
 **"Token-Refresh fehlgeschlagen"**
@@ -268,11 +351,19 @@ Alle Dependencies sind bereits im `yt-upload`-Environment:
 
 ```bash
 conda activate yt-upload
-# Alle Pakete sind bereits installiert:
+# Python-Pakete:
 # ttkbootstrap, pillow, pydantic, jsonschema,
 # python-dotenv, google-api-python-client,
 # google-auth, google-auth-oauthlib, pyyaml
 ```
+
+**Zusätzlich erforderlich (System):**
+```bash
+sudo apt install ffmpeg ffprobe
+# Für Container-SRT-Extraktion und Thumbnail-Generierung
+```
+
+**Hinweis:** Ohne ffmpeg funktioniert die App, aber Container-SRT und Thumbnails werden nicht automatisch verarbeitet.
 
 ### Konfiguration anpassen
 
@@ -312,9 +403,12 @@ python main.py
 
 ### "JSON-Validierung fehlgeschlagen"
 
-**Ursache:** `.info.json` fehlt Pflichtfelder (`title`, `description`)
+**Ursache:** `*_yt_profile.json` fehlt Pflichtfelder (`snippet`, `status`) oder hat falsches Format
 
-**Lösung:** Prüfe JSON-Struktur (siehe Beispiel oben).
+**Lösung:**
+- Prüfe dass Dateiname `*_yt_profile.json` ist
+- Verwende korrektes Format (siehe Abschnitt "Metadaten-Format")
+- Siehe `docs/PROMPT_YT_METADATA.md` für LLM-Prompt zur Generierung
 
 ### "Mehrdeutiger Match für Präfix"
 
@@ -353,8 +447,22 @@ python main.py
 - [x] Automatisches Token-Refresh
 - [x] Kapitel-Upload (in Description)
 
-### Version 3.0 - Erweiterte Features (Geplant)
-- [ ] Batch-Upload (mehrere Videos)
+### Version 3.0 - Batch Upload ✅
+- [x] Batch-Upload (mehrere Videos)
+- [x] Video-Liste mit Status-Tracking
+- [x] Sequentieller Upload aller Videos
+- [x] Fortschrittsanzeige pro Video
+
+### Version 4.0 - Multi-Profil & Automation ✅ (AKTUELL)
+- [x] Multi-Profil-Upload (ein Video → mehrere Profile)
+- [x] Favoriten-Verzeichnisse mit Schnellzugriff
+- [x] Container-SRT-Extraktion (ffmpeg)
+- [x] Automatische Thumbnail-Generierung (t=3s)
+- [x] Profil-Requirements (requires_srt, requires_json)
+- [x] Profil-Präferenzen-Speicherung
+- [x] Companion-Status-Anzeige (● ◐ ○)
+
+### Version 5.0 - Erweiterte Features (Geplant)
 - [ ] Playlist-Zuordnung
 - [ ] Preview-Funktion (Dry-Run)
 - [ ] Drag & Drop
@@ -380,7 +488,8 @@ Bei Fragen oder Problemen:
 
 ---
 
-**Version:** 2.0.0 (Vollständig funktionsfähig)
-**Status:** ✅ Production Ready - OAuth2, Video-, Untertitel- und Thumbnail-Upload implementiert
+**Version:** 4.0.0 (Multi-Profil & Automation)
+**Status:** ✅ Production Ready - Multi-Profil-Upload, Container-SRT-Extraktion, automatische Thumbnails
+**Abhängigkeiten:** Python 3.11, ffmpeg/ffprobe (optional für SRT/Thumbnail)
 **Getestet auf:** Ubuntu 24.04
-**Letzte Aktualisierung:** 2025-11-12
+**Letzte Aktualisierung:** 2025-11-13

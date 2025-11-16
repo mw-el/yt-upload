@@ -5,6 +5,8 @@ Verwaltet Credentials, Token-Refresh und API-Client-Erstellung.
 
 import os
 import pickle
+import shutil
+import webbrowser
 from pathlib import Path
 from typing import Optional
 
@@ -107,6 +109,8 @@ class YouTubeAuth:
             print("    Browser öffnet sich gleich...")
             print("    Bitte erlaube Zugriff auf dein YouTube-Konto.")
 
+            self._prefer_browser()
+
             flow = InstalledAppFlow.from_client_secrets_file(
                 str(self.client_secrets_path),
                 SCOPES
@@ -127,6 +131,32 @@ class YouTubeAuth:
 
         except Exception as e:
             raise AuthError(f"OAuth2-Flow fehlgeschlagen: {str(e)}")
+
+    def _prefer_browser(self):
+        """
+        Setzt standardmäßig Firefox als Browser für den OAuth-Login,
+        sofern kein anderer Browser erzwungen wird.
+        """
+        # Nutzer kann eigenen Browser über Umgebungsvariable festlegen
+        preferred = os.getenv("YOUTUBE_OAUTH_BROWSER")
+        if preferred:
+            os.environ["BROWSER"] = preferred
+            return
+
+        # Respektiere bereits gesetzte Browser-Settings
+        if os.environ.get("BROWSER"):
+            return
+
+        firefox_path = shutil.which("firefox")
+        if not firefox_path:
+            return
+
+        try:
+            webbrowser.get("firefox")
+            os.environ["BROWSER"] = "firefox"
+            print("    Browser-Vorgabe: Firefox (für OAuth-Login).")
+        except webbrowser.Error:
+            pass
 
     def _save_token(self):
         """Speichert Token in Datei."""

@@ -43,19 +43,20 @@ DEFAULT_PREFIX_LEN = 12
 SUPPORTED_VIDEO_EXTS = [".mp4", ".mov", ".m4v"]
 SUPPORTED_SUB_EXTS = [".srt"]
 SUPPORTED_INFO_EXTS = [".json"]
+SUPPORTED_THUMB_EXTS = [".png", ".jpg", ".jpeg", ".webp"]
 
 # ====================
 # GUI-Konstanten
 # ====================
 DEFAULT_FONT_FAMILY = "Ubuntu"
-DEFAULT_FONT_SIZE = 11
+DEFAULT_FONT_SIZE = 13  # Erhöht für HiDPI-Bildschirme
 DEFAULT_THEME = "flatly"  # Alternative: "cosmo"
 
 # Fenster-Dimensionen
-WINDOW_WIDTH = 700
-WINDOW_HEIGHT = 500
-WINDOW_MIN_WIDTH = 600
-WINDOW_MIN_HEIGHT = 400
+WINDOW_WIDTH = 900  # Vergrößert für 4 Favoriten-Buttons nebeneinander
+WINDOW_HEIGHT = 600
+WINDOW_MIN_WIDTH = 800
+WINDOW_MIN_HEIGHT = 500
 
 # ====================
 # Pfade
@@ -69,6 +70,17 @@ PROFILES_PATH = "assets/profiles.yaml"
 DEFAULT_CLIENT_SECRETS_PATH = os.path.expanduser("~/.config/yt-upload/client_secrets.json")
 DEFAULT_TOKEN_PATH = os.path.expanduser("~/.config/yt-upload/token.pickle")
 
+# Repo-lokaler Fallback (z.B. ./ .config/client_secrets.json)
+REPO_ROOT = Path(__file__).resolve().parents[1]
+LOCAL_CONFIG_DIR = REPO_ROOT / ".config"
+LOCAL_CLIENT_SECRETS_PATH = LOCAL_CONFIG_DIR / "client_secrets.json"
+
 # Aus .env laden (falls vorhanden)
-CLIENT_SECRETS_PATH = os.getenv("YOUTUBE_CLIENT_SECRETS_PATH", DEFAULT_CLIENT_SECRETS_PATH)
+CLIENT_SECRETS_PATH = os.getenv("YOUTUBE_CLIENT_SECRETS_PATH")
+if not CLIENT_SECRETS_PATH:
+    if LOCAL_CLIENT_SECRETS_PATH.exists():
+        CLIENT_SECRETS_PATH = str(LOCAL_CLIENT_SECRETS_PATH)
+    else:
+        CLIENT_SECRETS_PATH = DEFAULT_CLIENT_SECRETS_PATH
+
 TOKEN_PATH = os.getenv("YOUTUBE_TOKEN_PATH", DEFAULT_TOKEN_PATH)

@@ -5,8 +5,11 @@ Verwendet ttkbootstrap für moderne Optik und Ubuntu-Font.
 
 import tkinter as tk
 from tkinter import filedialog, messagebox
+from tkinter import ttk as tkttk  # Standard ttk für Treeview
 from pathlib import Path
 import threading
+from dataclasses import dataclass
+from typing import Optional, Dict, Any, List
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 
@@ -39,22 +42,46 @@ from app.uploader import upload, UploadError
 from app.auth import AuthError
 
 
+@dataclass
+class VideoItem:
+    """Repräsentiert ein Video mit zugehörigen Dateien."""
+    video_path: str
+    srt_path: Optional[str] = None
+    json_path: Optional[str] = None
+    factsheet_data: Optional[Dict[str, Any]] = None
+    status: str = "Warte"  # Status: Warte, Läuft, Fertig, Fehler
+
+    @property
+    def video_name(self) -> str:
+        return Path(self.video_path).name
+
+    @property
+    def has_srt(self) -> bool:
+        return self.srt_path is not None
+
+    @property
+    def has_json(self) -> bool:
+        return self.json_path is not None and self.factsheet_data is not None
+
+    @property
+    def is_ready(self) -> bool:
+        return self.has_json  # SRT ist optional
+
+
 class YouTubeUploadApp:
     """Haupt-GUI-Klasse für YouTube-Upload-Tool."""
 
     def __init__(self, root: ttk.Window):
         self.root = root
-        self.root.title("YouTube Upload Tool")
-        self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
-        self.root.minsize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
+        self.root.title("YouTube Upload Tool - Batch Mode")
+        self.root.geometry("900x650")
+        self.root.minsize(800, 600)
 
-        # State-Variablen
-        self.video_path: str | None = None
-        self.srt_path: str | None = None
-        self.json_path: str | None = None
-        self.factsheet_data: dict | None = None
+        # State-Variablen für Batch-Upload
+        self.videos: List[VideoItem] = []
         self.profiles: dict = {}
         self.selected_profile: str | None = None
+        self.upload_running = False
 
         # Lade Profile
         self._load_profiles()
@@ -226,7 +253,7 @@ class YouTubeUploadApp:
 
         self.upload_button = ttk.Button(
             upload_frame,
-            text="🚀 Video hochladen",
+            text="▸ Video hochladen",
             command=self._upload_video,
             bootstyle=SUCCESS,
             state=DISABLED,
@@ -588,7 +615,7 @@ class YouTubeUploadApp:
 
         ttk.Button(
             watch_frame,
-            text="📋 Kopieren",
+            text="□ Kopieren",
             command=lambda: self._copy_to_clipboard(result.watch_url, "Watch-URL kopiert!"),
             bootstyle=INFO,
             width=15
@@ -605,7 +632,7 @@ class YouTubeUploadApp:
 
         ttk.Button(
             embed_frame,
-            text="📋 Kopieren",
+            text="□ Kopieren",
             command=lambda: self._copy_to_clipboard(result.embed_url, "Embed-URL kopiert!"),
             bootstyle=INFO,
             width=15
