@@ -216,15 +216,12 @@ class BatchUploadApp:
 
     THUMB_DISPLAY_WIDTH = 180
 
-    def __init__(self, root: ttk.Window):
+    def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("YouTube Upload Tool - Batch Mode")
         self.root.geometry("1000x700")
         self.root.minsize(900, 650)
-        try:
-            self.root.wm_class("YouTubeUploadTool")
-        except tk.TclError:
-            pass
+        # className is already set in run_app() via tk.Tk(className=...)
 
         # State
         self.videos: List[VideoItem] = []
@@ -1455,6 +1452,12 @@ class BatchUploadApp:
 
 def run_app():
     """Startet Batch-Upload-App."""
-    app = ttk.Window(themename=DEFAULT_THEME)
+    # Use tk.Tk with className for proper desktop integration
+    # (ttk.Window doesn't support className parameter)
+    app = tk.Tk(className='YouTubeUploadTool')
+
+    # Apply ttkbootstrap theme via Style
+    style = ttk.Style(theme=DEFAULT_THEME)
+
     BatchUploadApp(app)
     app.mainloop()
