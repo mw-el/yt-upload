@@ -58,6 +58,19 @@ python main.py
 
 **Wichtig:** Die App läuft nur im `yt-upload`-Environment. Bei falschem Environment erscheint eine klare Fehlermeldung mit Hinweis auf `./start.sh`.
 
+### 4. Desktop-Integration (Optional)
+
+Die App kann in die Desktop-Umgebung integriert werden:
+
+```bash
+# Desktop-Datei ist bereits im Repo enthalten
+# Installation:
+cp youtube-upload-tool.desktop ~/.local/share/applications/
+update-desktop-database ~/.local/share/applications/
+```
+
+Danach erscheint "YouTube Upload Tool" im Application Launcher mit YouTube-Icon.
+
 ---
 
 ## Projektstruktur
@@ -65,23 +78,32 @@ python main.py
 ```
 /
 ├── app/                    # Haupt-Anwendungslogik
+│   ├── asset_manager.py    # Asset-Manager-Fenster für hochgeladene Videos
 │   ├── auth.py             # OAuth2-Authentifizierung
 │   ├── companion.py        # Container-SRT & Thumbnail (ffmpeg)
 │   ├── config.py           # Konfiguration & Environment-Check
 │   ├── favorites.py        # Favoriten-Verzeichnisse & Profil-Präferenzen
-│   ├── gui.py              # Einzelvideo-GUI (Legacy)
-│   ├── gui_batch.py        # Multi-Profil-Batch-GUI (Standard)
+│   ├── gui_batch.py        # Multi-Profil-Batch-GUI (Haupt-GUI)
 │   ├── matching.py         # Dateisuche (Präfix-basiert)
 │   ├── profiles.py         # Profil-Handling
 │   ├── factsheet_schema.py # JSON-Schema-Validierung
+│   ├── svg_icons.py        # SVG-Icon-Loader (YouTube & Upload Icons)
 │   ├── tooltips.py         # Hover-Tooltips
-│   └── uploader.py         # YouTube-Upload (vollständig implementiert)
+│   ├── uploader.py         # YouTube-Upload (vollständig implementiert)
+│   ├── youtube_assets.py   # YouTube Data API für Asset-Manager
+│   └── source_map.py       # Video-Quellordner-Mapping
 ├── assets/
 │   └── profiles.yaml       # Upload-Profile (mit default_selected, requires_*)
 ├── docs/
 │   ├── ARCHITECTURE.md     # Architektur-Dokumentation
-│   ├── DEVLOG.md           # Entwicklungsfortschritt
-│   └── README_OAUTH.md     # OAuth2-Setup-Anleitung
+│   ├── FILE_NAMING_CONVENTIONS.md  # Dateinamen-Konventionen
+│   ├── PROMPT_YT_METADATA.md       # LLM-Prompt für Metadaten
+│   ├── README_OAUTH.md     # OAuth2-Setup-Anleitung
+│   └── archive/            # Veraltete Dokumentation und Code
+├── youtube-svgrepo-com.svg         # YouTube-Logo (SVG)
+├── image_arrow_up_24dp_*.svg       # Upload-Icon (SVG)
+├── YT_upl.png              # App-Icon
+├── youtube-upload-tool.desktop     # Desktop-Integration
 ├── start.sh                # Starter-Script (aktiviert Environment automatisch)
 ├── fix_fonts.sh            # Font-Fix für Ubuntu
 ├── main.py                 # Einstiegspunkt (startet Batch-Upload-GUI)

@@ -7,6 +7,8 @@ from __future__ import annotations
 from typing import List, Dict, Any, Optional
 
 from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaFileUpload
+from pathlib import Path
 
 from app.auth import create_youtube_client, AuthError
 from app.config import CLIENT_SECRETS_PATH, TOKEN_PATH
@@ -68,3 +70,68 @@ def fetch_uploaded_videos(max_results: int = 25) -> List[Dict[str, Any]]:
 
     except HttpError as e:
         raise UploadError(f"YouTube API-Fehler beim Laden der Videos:\n{e}")
+
+
+def update_video_metadata(
+    video_id: str,
+    title: str,
+    description: str,
+    privacy_status: str,
+    tags: List[str],
+    publish_at: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Aktualisiert Metadaten eines bestehenden YouTube-Videos.
+    """
+    try:
+        youtube = create_youtube_client(CLIENT_SECRETS_PATH, TOKEN_PATH)
+    except AuthError as e:
+        raise UploadError(f"Authentifizierung fehlgeschlagen:\n{e}")
+
+    body: Dict[str, Any] = {
+        "id": video_id,
+        "snippet": {
+            "title": title or "Untitled",
+            "description": description or "",
+            "categoryId": "22",
+        },
+        "status": {
+            "privacyStatus": privacy_status or "unlisted"
+        }
+    }
+
+    if tags:
+        body["snippet"]["tags"] = tags
+
+    if publish_at:
+        body["status"]["publishAt"] = publish_at
+
+    try:
+        response = youtube.videos().update(
+            part="snippet,status",
+            body=body
+        ).execute()
+        return response
+    except HttpError as e:
+        raise UploadError(f"YouTube API-Fehler beim Aktualisieren:\n{e}")
+
+
+def upload_video_thumbnail(video_id: str, thumbnail_path: str) -> Dict[str, Any]:
+    """
+    Lädt ein benutzerdefiniertes Thumbnail für ein bestehendes Video hoch.
+    """
+    try:
+        youtube = create_youtube_client(CLIENT_SECRETS_PATH, TOKEN_PATH)
+    except AuthError as e:
+        raise UploadError(f"Authentifizierung fehlgeschlagen:\n{e}")
+
+    media = MediaFileUpload(thumbnail_path, mimetype="image/jpeg")
+
+    try:
+        response = youtube.thumbnails().set(
+            videoId=video_id,
+            media_body=media
+        ).execute()
+        return response
+    except HttpError as e:
+        raise UploadError(f"YouTube API-Fehler beim Thumbnail-Upload:\n{e}")

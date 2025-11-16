@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=YouTube Upload Tool
+Comment=Multi-Profile Batch Upload für YouTube Videos
+Exec=/home/matthias/_AA_YT_Upl/start.sh
+Icon=/home/matthias/_AA_YT_Upl/YT_upl.png
+Terminal=false
+Categories=AudioVideo;Video;
+Keywords=youtube;upload;video;batch;
+StartupNotify=true
+StartupWMClass=YouTubeUploadTool

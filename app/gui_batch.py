@@ -3,6 +3,8 @@ GUI mit Batch-Upload-Funktionalität.
 Erlaubt Auswahl mehrerer Videos und automatisches Matching.
 """
 
+import os
+import webbrowser
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk as tkttk
@@ -21,7 +23,11 @@ from app.config import (
     DEFAULT_THEME,
     SUPPORTED_VIDEO_EXTS,
     CLIENT_SECRETS_PATH,
-    TOKEN_PATH
+    TOKEN_PATH,
+    CHANNEL_PUBLIC_URL,
+    CHANNEL_STUDIO_URL,
+    YOUTUBE_RED,
+    YOUTUBE_LOGO
 )
 from app.matching import (
     find_companion_files_multi,
@@ -46,6 +52,10 @@ from app.favorites import (
     save_profile_preferences
 )
 from app.asset_manager import AssetManagerWindow
+from app.svg_icons import load_youtube_icon, load_upload_icon
+
+CHANNEL_PUBLIC_URL = "https://www.youtube.com/@SchreibszeneChProfil"
+CHANNEL_STUDIO_URL = "https://studio.youtube.com/channel/UCHBvwrKQfEwEWt4bKF1p0mQ"
 from app.companion import (
     check_ffmpeg_available,
     find_subtitle_streams,
@@ -211,6 +221,10 @@ class BatchUploadApp:
         self.root.title("YouTube Upload Tool - Batch Mode")
         self.root.geometry("1000x700")
         self.root.minsize(900, 650)
+        try:
+            self.root.wm_class("YouTubeUploadTool")
+        except tk.TclError:
+            pass
 
         # State
         self.videos: List[VideoItem] = []
@@ -226,6 +240,10 @@ class BatchUploadApp:
         self.last_directory_selection = str(Path.home())
         self.asset_window = None
 
+        # YouTube-Icon für Buttons
+        self.youtube_icon = None
+        self._load_youtube_icon()
+
         # Lade Profile & Favoriten
         self._load_profiles()
         self._load_favorites()
@@ -235,6 +253,17 @@ class BatchUploadApp:
         # GUI aufbauen
         self._create_widgets()
         self._ensure_initial_auth()
+
+    def _load_youtube_icon(self):
+        """Lädt YouTube-Icon aus SVG für Buttons."""
+        try:
+            from PIL import ImageTk
+            # Lade YouTube-Icon (weiß auf rotem Hintergrund)
+            icon_img = load_youtube_icon(size=16, bg_color=YOUTUBE_RED)
+            self.youtube_icon = ImageTk.PhotoImage(icon_img)
+        except Exception as e:
+            print(f"⚠ YouTube-Icon konnte nicht geladen werden: {e}")
+            self.youtube_icon = None
 
     def _load_profiles(self):
         """Lädt Upload-Profile aus YAML."""
@@ -325,30 +354,60 @@ class BatchUploadApp:
             )
             settings_btn.pack(side=LEFT)
 
-        # Globale Steuer-Buttons
-        global_controls = ttk.Frame(self.favorites_frame)
-        global_controls.pack(side=RIGHT)
+        # Globale Steuer-Buttons (links)
+        global_controls_left = ttk.Frame(self.favorites_frame)
+        global_controls_left.pack(side=LEFT, padx=(10, 0))
 
         ttk.Button(
-            global_controls,
+            global_controls_left,
             text="Ordner wählen…",
             command=self._add_folders,
             bootstyle=INFO
         ).pack(side=LEFT, padx=5)
 
         ttk.Button(
-            global_controls,
+            global_controls_left,
             text="× Liste leeren",
             command=self._clear_videos,
             bootstyle=SECONDARY
         ).pack(side=LEFT, padx=5)
 
-        ttk.Button(
-            global_controls,
-            text="📚 Assets",
+        # YouTube-Buttons (rechts)
+        global_controls_right = ttk.Frame(self.favorites_frame)
+        global_controls_right.pack(side=RIGHT)
+
+        # Kanal-Button mit YouTube-Icon
+        btn_kanal = ttk.Button(
+            global_controls_right,
+            text=" Kanal",
+            command=self._open_channel,
+            bootstyle=DANGER,
+            image=self.youtube_icon if self.youtube_icon else None,
+            compound=LEFT
+        )
+        btn_kanal.pack(side=LEFT, padx=5)
+
+        # Studio-Button mit YouTube-Icon
+        btn_studio = ttk.Button(
+            global_controls_right,
+            text=" Studio",
+            command=self._open_studio,
+            bootstyle=DANGER,
+            image=self.youtube_icon if self.youtube_icon else None,
+            compound=LEFT
+        )
+        btn_studio.pack(side=LEFT, padx=5)
+
+        # Assets-Button ganz rechts in YouTube-Rot mit Icon
+        self.assets_button = ttk.Button(
+            global_controls_right,
+            text=" Assets",
             command=self._open_asset_manager,
-            bootstyle=INFO
-        ).pack(side=LEFT, padx=5)
+            bootstyle=DANGER,
+            image=self.youtube_icon if self.youtube_icon else None,
+            compound=LEFT
+        )
+        self.assets_button.pack(side=LEFT, padx=5)
 
     def _create_video_info_bar(self, parent):
         """Zeigt Info (z.B. Video-Anzahl)."""
@@ -727,6 +786,25 @@ class BatchUploadApp:
             return
 
         self.asset_window = AssetManagerWindow(self)
+
+    def _open_channel(self):
+        """Öffnet den öffentlichen YouTube-Kanal im bevorzugten Browser."""
+        self._open_in_browser(CHANNEL_PUBLIC_URL)
+
+    def _open_studio(self):
+        """Öffnet das YouTube Studio des Kanals im bevorzugten Browser."""
+        self._open_in_browser(CHANNEL_STUDIO_URL)
+
+    def _open_in_browser(self, url: str):
+        """Hilfsfunktion zum Öffnen von URLs mit bevorzugtem Browser."""
+        preferred = os.getenv("YOUTUBE_OAUTH_BROWSER") or os.getenv("BROWSER")
+        if preferred:
+            try:
+                webbrowser.get(preferred).open(url)
+                return
+            except webbrowser.Error:
+                pass
+        webbrowser.open(url)
 
     def _add_videos_from_dir(self, start_dir: str):
         """Öffnet Datei-Dialog mit vorgegebenem Startverzeichnis."""

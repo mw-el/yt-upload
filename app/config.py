@@ -50,7 +50,11 @@ SUPPORTED_THUMB_EXTS = [".png", ".jpg", ".jpeg", ".webp"]
 # ====================
 DEFAULT_FONT_FAMILY = "Ubuntu"
 DEFAULT_FONT_SIZE = 13  # Erhöht für HiDPI-Bildschirme
-DEFAULT_THEME = "flatly"  # Alternative: "cosmo"
+DEFAULT_THEME = "cosmo"  # Moderne Themes: "cosmo", "flatly", "litera", "minty"
+
+# YouTube-Branding
+YOUTUBE_RED = "#CC0000"  # Offizielles YouTube-Rot (weinrot)
+YOUTUBE_LOGO = "▶"  # Alternativ: "⏵" oder einfach "YT"
 
 # Fenster-Dimensionen
 WINDOW_WIDTH = 900  # Vergrößert für 4 Favoriten-Buttons nebeneinander
@@ -84,3 +88,9 @@ if not CLIENT_SECRETS_PATH:
         CLIENT_SECRETS_PATH = DEFAULT_CLIENT_SECRETS_PATH
 
 TOKEN_PATH = os.getenv("YOUTUBE_TOKEN_PATH", DEFAULT_TOKEN_PATH)
+
+# ====================
+# YouTube Channel Links
+# ====================
+CHANNEL_PUBLIC_URL = os.getenv("YOUTUBE_CHANNEL_URL", "https://www.youtube.com/@SchreibszeneChProfil")
+CHANNEL_STUDIO_URL = os.getenv("YOUTUBE_STUDIO_URL", "https://studio.youtube.com/channel/UCHBvwrKQfEwEWt4bKF1p0mQ")

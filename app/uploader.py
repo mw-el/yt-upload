@@ -12,6 +12,7 @@ from googleapiclient.errors import HttpError
 
 from app.auth import create_youtube_client, AuthError
 from app.config import CLIENT_SECRETS_PATH, TOKEN_PATH
+from app.source_map import update_source_folder
 
 
 class UploadError(Exception):
@@ -321,10 +322,16 @@ def upload(
         or factsheet_data.get('title')
         or 'Unbekannter Titel'
     )
-    return UploadResult(
+    result = UploadResult(
         video_id=video_id,
         title=resolved_title
     )
+    try:
+        update_source_folder(video_id, str(Path(video_path).parent))
+    except Exception:
+        pass
+
+    return result
 
 
 def validate_upload_prerequisites() -> Tuple[bool, str]:

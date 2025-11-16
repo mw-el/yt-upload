@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=YouTube Upload Tool
+Comment=Batch-Uploads für YouTube mit Profilen und Asset-Manager
+Exec=__APP_EXEC__
+Icon=__APP_ICON__
+Terminal=false
+Categories=AudioVideo;Utility;
+StartupNotify=true
+StartupWMClass=YouTubeUploadTool
+Keywords=youtube;upload;video;batch;
