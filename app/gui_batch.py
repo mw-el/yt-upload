@@ -44,6 +44,7 @@ from app.factsheet_schema import load_and_validate_factsheet
 from app.tooltips import create_tooltip
 from app.uploader import upload, UploadError, UploadResult
 from app.auth import AuthError, create_youtube_client
+from app.quick_upload_dialog import QuickUploadDialog
 from app.favorites import (
     load_favorites,
     save_favorites,
@@ -52,7 +53,10 @@ from app.favorites import (
     save_profile_preferences
 )
 from app.asset_manager import AssetManagerWindow
-from app.svg_icons import load_youtube_icon, load_upload_icon
+from app.svg_icons import load_youtube_icon, load_upload_icon, load_folder_icon
+from app.youtube_assets import find_video_by_title, replace_video_file
+from PIL import ImageTk
+from app.config import COLORS
 
 CHANNEL_PUBLIC_URL = "https://www.youtube.com/@SchreibszeneChProfil"
 CHANNEL_STUDIO_URL = "https://studio.youtube.com/channel/UCHBvwrKQfEwEWt4bKF1p0mQ"
@@ -251,6 +255,9 @@ class BatchUploadApp:
         self._create_widgets()
         self._ensure_initial_auth()
 
+        # Close-Handler für sauberes Beenden
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
     def _load_youtube_icon(self):
         """Lädt YouTube-Icon aus SVG für Buttons."""
         try:
@@ -290,20 +297,9 @@ class BatchUploadApp:
         self.main_frame = ttk.Frame(self.root, padding=20)
         self.main_frame.pack(fill=BOTH, expand=YES)
 
-        # Titel
-        ttk.Label(
-            self.main_frame,
-            text="YouTube Upload Tool - Batch Mode",
-            font=(DEFAULT_FONT_FAMILY, 16, "bold"),
-            bootstyle=PRIMARY
-        ).pack(pady=(0, 15))
-
-        # Favoriten-Leiste
+        # Favoriten-Leiste (ohne Titel-Label)
         self.favorites_frame = None
         self._create_favorites_bar(self.main_frame)
-
-        # Info-Bar (z.B. Anzahl Videos)
-        self._create_video_info_bar(self.main_frame)
 
         # Video-Liste (Treeview)
         self._create_video_list(self.main_frame)
@@ -317,110 +313,122 @@ class BatchUploadApp:
         if self.favorites_frame:
             self.favorites_frame.destroy()
 
-        self.favorites_frame = ttk.Labelframe(
-            parent,
-            text="☰ Favoriten",
-            padding=10,
-            bootstyle=INFO
-        )
+        self.favorites_frame = ttk.Frame(parent)
         self.favorites_frame.pack(fill=X, pady=(0, 10))
 
-        for fav in self.favorites:
-            btn_container = ttk.Frame(self.favorites_frame)
-            btn_container.pack(side=LEFT, padx=5)
+        # Farbe für Rahmen und Buttons (szbrightblue)
+        szbrightblue = COLORS["szbrightblue"]
 
-            # Button-Label: Verzeichnisname statt Label
+        # Gemeinsamer Rahmen für alle 4 Favoriten (3 Favoriten + Ordner wählen)
+        favorites_container = ttk.Labelframe(
+            self.favorites_frame,
+            text="Podcast-Bündel-Uploads",
+            padding=5,
+            bootstyle=PRIMARY  # Verwendet szbrightblue durch Theme
+        )
+        favorites_container.pack(side=LEFT, padx=(0, 10))
+
+        # Erste 3 Favoriten
+        for idx, fav in enumerate(self.favorites[:3]):
+            btn_container = ttk.Frame(favorites_container)
+            btn_container.pack(side=LEFT, padx=2)
+
+            # Button-Label: Nur Verzeichnisname
             dir_name = Path(fav["path"]).name if Path(fav["path"]).exists() else fav["label"]
 
-            # Haupt-Button (öffnet Ordner-Scan)
+            # Haupt-Button (öffnet Ordner-Scan) - schmaler
             main_btn = ttk.Button(
                 btn_container,
                 text=dir_name,
                 command=lambda p=fav["path"]: self._on_favorite_clicked(p),
-                bootstyle=INFO
+                bootstyle=PRIMARY,
+                width=10
             )
-            main_btn.pack(side=LEFT, padx=(0, 2))
+            main_btn.pack(side=LEFT, padx=(0, 1))
 
-            # Einstellungs-Button (schmaler)
+            # Einstellungs-Button mit Gear-Icon ⚙ - schmaler, größere Schrift
             settings_btn = ttk.Button(
                 btn_container,
-                text="●",
+                text="⚙",
                 command=lambda f=fav: self._configure_favorite(f),
                 bootstyle=SECONDARY,
                 width=2
             )
             settings_btn.pack(side=LEFT)
 
-        # Globale Steuer-Buttons (links)
-        global_controls_left = ttk.Frame(self.favorites_frame)
-        global_controls_left.pack(side=LEFT, padx=(10, 0))
+        # Ordner wählen mit Material Design Folder Icon
+        folder_container = ttk.Frame(favorites_container)
+        folder_container.pack(side=LEFT, padx=2)
 
-        ttk.Button(
-            global_controls_left,
-            text="Ordner wählen…",
+        # Lade Folder-Icon
+        folder_icon_pil = load_folder_icon(size=28, bg_color=szbrightblue)
+        self.folder_icon = ImageTk.PhotoImage(folder_icon_pil)
+
+        folder_btn = ttk.Button(
+            folder_container,
+            image=self.folder_icon,
             command=self._add_folders,
-            bootstyle=INFO
-        ).pack(side=LEFT, padx=5)
+            bootstyle=PRIMARY
+        )
+        folder_btn.pack()
+
+        # Einzel Upload Button (ohne Rahmen, auf gleicher Höhe)
+        ttk.Button(
+            self.favorites_frame,
+            text="Einzel Upload",
+            command=self._open_quick_upload,
+            bootstyle=SUCCESS,
+            padding=(10, 5)
+        ).pack(side=LEFT, padx=(10, 0))
+
+        # YouTube-Rahmen (rechts)
+        youtube_container = ttk.Labelframe(
+            self.favorites_frame,
+            text="YouTube",
+            padding=5,
+            bootstyle=DANGER
+        )
+        youtube_container.pack(side=RIGHT)
 
         ttk.Button(
-            global_controls_left,
-            text="× Liste leeren",
-            command=self._clear_videos,
-            bootstyle=SECONDARY
-        ).pack(side=LEFT, padx=5)
-
-        # YouTube-Buttons (rechts)
-        global_controls_right = ttk.Frame(self.favorites_frame)
-        global_controls_right.pack(side=RIGHT)
-
-        # Kanal-Button mit YouTube-Icon
-        btn_kanal = ttk.Button(
-            global_controls_right,
-            text=" Kanal",
+            youtube_container,
+            text="Kanal",
             command=self._open_channel,
             bootstyle=DANGER,
-            image=self.youtube_icon if self.youtube_icon else None,
-            compound=LEFT
-        )
-        btn_kanal.pack(side=LEFT, padx=5)
+            width=6
+        ).pack(side=LEFT, padx=2)
 
-        # Studio-Button mit YouTube-Icon
-        btn_studio = ttk.Button(
-            global_controls_right,
-            text=" Studio",
+        ttk.Button(
+            youtube_container,
+            text="Studio",
             command=self._open_studio,
             bootstyle=DANGER,
-            image=self.youtube_icon if self.youtube_icon else None,
-            compound=LEFT
-        )
-        btn_studio.pack(side=LEFT, padx=5)
+            width=6
+        ).pack(side=LEFT, padx=2)
 
-        # Assets-Button ganz rechts in YouTube-Rot mit Icon
-        self.assets_button = ttk.Button(
-            global_controls_right,
-            text=" Assets",
+        ttk.Button(
+            youtube_container,
+            text="Videos",
             command=self._open_asset_manager,
             bootstyle=DANGER,
-            image=self.youtube_icon if self.youtube_icon else None,
-            compound=LEFT
-        )
-        self.assets_button.pack(side=LEFT, padx=5)
+            width=6
+        ).pack(side=LEFT, padx=2)
 
-    def _create_video_info_bar(self, parent):
-        """Zeigt Info (z.B. Video-Anzahl)."""
-        info_frame = ttk.Frame(parent)
-        info_frame.pack(fill=X, pady=(5, 10))
-
-        self.video_count_label = ttk.Label(
-            info_frame,
-            text="0 Videos",
-            font=(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE),
-            foreground="gray"
-        )
-        self.video_count_label.pack(side=LEFT)
 
     def _create_video_list(self, parent):
         """Erstellt Video-Tabelle mit Thumbnails, Dateien und Profil-Checkboxen."""
+
+        # Header mit "Liste leeren" Button rechts
+        list_header = ttk.Frame(parent)
+        list_header.pack(fill=X, pady=(0, 5))
+
+        ttk.Button(
+            list_header,
+            text="× Liste leeren",
+            command=self._clear_videos,
+            bootstyle=SECONDARY
+        ).pack(side=RIGHT)
+
         list_frame = ttk.Labelframe(
             parent,
             text="Videos",
@@ -728,6 +736,15 @@ class BatchUploadApp:
         )
         self.upload_button.pack(side=LEFT)
 
+        # Replace if exists Checkbox (default: aktiviert)
+        self.replace_if_exists_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            upload_frame,
+            text="Replace if exists (ersetzt vorhandene Videos mit gleichem Titel)",
+            variable=self.replace_if_exists_var,
+            bootstyle="success-round-toggle"
+        ).pack(side=LEFT, padx=(15, 0))
+
         # Status
         self.status_label = ttk.Label(
             upload_frame,
@@ -783,6 +800,10 @@ class BatchUploadApp:
             return
 
         self.asset_window = AssetManagerWindow(self)
+
+    def _open_quick_upload(self):
+        """Öffnet Quick Upload Dialog für einzelne Video-Uploads."""
+        QuickUploadDialog(self)
 
     def _open_channel(self):
         """Öffnet den öffentlichen YouTube-Kanal im bevorzugten Browser."""
@@ -1097,13 +1118,7 @@ class BatchUploadApp:
             if video.thumbnail_path and Path(video.thumbnail_path).exists():
                 self.root.after(0, self._load_thumbnail, video, i)
 
-        # Update Count
-        count = len(self.videos)
-        ready_count = sum(1 for v in self.videos if v.is_ready)
-        self.video_count_label.config(
-            text=f"{count} Videos ({ready_count} bereit)",
-            foreground="green" if ready_count > 0 else "gray"
-        )
+        # Video Count wurde entfernt - keine Anzeige mehr nötig
 
     def _load_thumbnail(self, video: VideoItem, row_index: int):
         """Lädt Thumbnail-Bild für Video-Row."""
@@ -1259,14 +1274,65 @@ class BatchUploadApp:
                     profile_data = get_profile(profile_name, self.profiles)
                     status_cb, progress_cb = self._make_upload_callbacks(video, profile_name)
 
-                    result = upload(
-                        video_path=video.video_path,
-                        srt_path=video.srt_path,
-                        factsheet_data=video.factsheet_data,
-                        profile_data=profile_data,
-                        progress_callback=progress_cb,
-                        status_callback=status_cb
-                    )
+                    # Füge Thumbnail zu Factsheet hinzu, falls vorhanden
+                    factsheet_with_thumbnail = video.factsheet_data.copy()
+                    if video.thumbnail_path and 'thumbnail' not in factsheet_with_thumbnail:
+                        factsheet_with_thumbnail['thumbnail'] = video.thumbnail_path
+
+                    # Replace if exists: Suche vorhandenes Video mit gleichem Titel
+                    video_id_to_replace = None
+                    if self.replace_if_exists_var.get():
+                        title = factsheet_with_thumbnail.get("snippet", {}).get("title", "")
+                        if title:
+                            try:
+                                existing_video = find_video_by_title(title)
+                                if existing_video:
+                                    video_id_to_replace = existing_video.get("id")
+                                    self.root.after(0, self._append_video_status, video, f"  → Video existiert, wird ersetzt (ID: {video_id_to_replace[:8]}...)")
+                            except Exception as e:
+                                # Fehler beim Suchen ignorieren, normaler Upload fortsetzen
+                                print(f"⚠ Fehler beim Suchen des Videos: {e}")
+
+                    # Wenn Replace-Modus und Video gefunden: Ersetze Video-Datei
+                    if video_id_to_replace:
+                        try:
+                            # Ersetze Video-Datei
+                            def replace_progress_cb(current, total):
+                                percent = int((current / total) * 100)
+                                progress_cb({"progress": percent, "total": 100})
+
+                            replace_video_file(video_id_to_replace, video.video_path, progress_callback=replace_progress_cb)
+
+                            # Erstelle UploadResult mit vorhandener Video-ID
+                            from app.uploader import UploadResult
+                            result = UploadResult(
+                                video_id=video_id_to_replace,
+                                video_path=video.video_path,
+                                srt_path=video.srt_path,
+                                profile=profile_name,
+                                title=title
+                            )
+                        except Exception as replace_error:
+                            # Falls Replace fehlschlägt, normalen Upload durchführen
+                            self.root.after(0, self._append_video_status, video, f"  → Replace fehlgeschlagen, normaler Upload...")
+                            result = upload(
+                                video_path=video.video_path,
+                                srt_path=video.srt_path,
+                                factsheet_data=factsheet_with_thumbnail,
+                                profile_data=profile_data,
+                                progress_callback=progress_cb,
+                                status_callback=status_cb
+                            )
+                    else:
+                        # Normaler Upload
+                        result = upload(
+                            video_path=video.video_path,
+                            srt_path=video.srt_path,
+                            factsheet_data=factsheet_with_thumbnail,
+                            profile_data=profile_data,
+                            progress_callback=progress_cb,
+                            status_callback=status_cb
+                        )
                     success_results.append(result)
                     self.batch_progress["success"] += 1
                     self._write_upload_log(video, profile_name, success=True, result=result)
@@ -1336,21 +1402,25 @@ class BatchUploadApp:
             status = payload.get("status") or "n/a"
             return prefix + f"Metadaten bereit ({status})"
         if event == "upload_start":
-            return prefix + f"Upload gestartet ({payload.get('filename', '')})"
+            filename = payload.get('filename', '')
+            return prefix + f"Lade Video hoch: {filename}"
         if event == "upload_success":
-            return prefix + f"Upload abgeschlossen (ID: {payload.get('video_id', 'n/a')})"
+            video_id = payload.get('video_id', 'n/a')
+            return prefix + f"Video-Upload erfolgreich! (ID: {video_id[:8]}...)"
         if event == "captions_start":
-            return prefix + f"Untertitel: {payload.get('filename', '')}"
+            filename = payload.get('filename', '')
+            return prefix + f"Lade Untertitel hoch: {filename}"
         if event == "captions_success":
             lang = payload.get("language", "de")
-            return prefix + f"Untertitel erledigt ({lang})"
+            return prefix + f"Untertitel-Upload erfolgreich ({lang})"
         if event == "captions_error":
             message = payload.get("message", "Fehler")
             return prefix + f"Untertitel-Fehler: {message[:40]}..."
         if event == "thumbnail_start":
-            return prefix + "Thumbnail hochladen..."
+            filename = payload.get('filename', '')
+            return prefix + f"Lade Thumbnail hoch: {filename}"
         if event == "thumbnail_success":
-            return prefix + "Thumbnail erledigt"
+            return prefix + "Thumbnail-Upload erfolgreich"
         if event == "thumbnail_error":
             message = payload.get("message", "Fehler")
             return prefix + f"Thumbnail-Fehler: {message[:40]}..."
@@ -1448,6 +1518,13 @@ class BatchUploadApp:
         self.status_label.config(text="Fehler beim Batch-Upload", foreground="red")
         self._update_upload_button_state()
         messagebox.showerror("Fehler", error_msg)
+
+    def _on_close(self):
+        """Beendet Anwendung ordnungsgemäß."""
+        import sys
+        self.root.quit()
+        self.root.destroy()
+        sys.exit(0)
 
 
 def run_app():

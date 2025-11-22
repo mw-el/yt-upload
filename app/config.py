@@ -46,11 +46,32 @@ SUPPORTED_INFO_EXTS = [".json"]
 SUPPORTED_THUMB_EXTS = [".png", ".jpg", ".jpeg", ".webp"]
 
 # ====================
-# GUI-Konstanten
+# GUI-Konstanten (schreibszene.ch Design)
 # ====================
 DEFAULT_FONT_FAMILY = "Ubuntu"
-DEFAULT_FONT_SIZE = 13  # Erhöht für HiDPI-Bildschirme
+DEFAULT_FONT_SIZE = 14  # Basis-Größe wie in _AA_Sprich
 DEFAULT_THEME = "cosmo"  # Moderne Themes: "cosmo", "flatly", "litera", "minty"
+
+# schreibszene.ch Farbpalette
+COLORS = {
+    "szbrightblue":  "#0eb1d2",
+    "szgreen":       "#688e26",
+    "szbrightgreen": "#98ce00",
+    "szorange":      "#f7b33b",
+    "szpaper":       "#fffdf9",
+    "szred":         "#ff3333",
+    "szyellow":      "#fdcb34",
+    "szpink":        "#cb20c5",
+    "szblue":        "#2176ae",
+
+    "primary":   "#0eb1d2",  # szbrightblue
+    "secondary": "#98ce00",  # szbrightgreen
+    "tertiary":  "#f7b33b",  # szorange
+    "success":   "#688e26",  # szgreen
+    "warning":   "#fdcb34",  # szyellow
+    "danger":    "#ff3333",  # szred
+    "info":      "#2176ae",  # szblue
+}
 
 # YouTube-Branding
 YOUTUBE_RED = "#CC0000"  # Offizielles YouTube-Rot (weinrot)

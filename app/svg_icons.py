@@ -117,13 +117,13 @@ def load_youtube_icon(size=16, bg_color=None):
     return svg_to_pil(svg_path, size, fill_color='white', bg_color=bg_color)
 
 
-def load_upload_icon(size=24, bg_color='#ff7b33'):
+def load_upload_icon(size=24, bg_color='#f7b33b'):
     """
     Lädt Upload-Icon (weiß auf orange).
 
     Args:
         size: Icon-Größe
-        bg_color: Hintergrundfarbe (default: orange #ff7b33)
+        bg_color: Hintergrundfarbe (default: schreibszene.ch orange #f7b33b)
     """
     svg_path = Path(__file__).parent.parent / 'image_arrow_up_24dp_1F1F1F_FILL0_wght400_GRAD0_opsz24.svg'
     if not svg_path.exists():
@@ -131,3 +131,47 @@ def load_upload_icon(size=24, bg_color='#ff7b33'):
         return _create_fallback_icon(svg_path, size, 'white', bg_color)
 
     return svg_to_pil(svg_path, size, fill_color='white', bg_color=bg_color)
+
+
+def load_folder_icon(size=24, bg_color='#0eb1d2'):
+    """
+    Erstellt Material Design Folder Icon (weiß auf blau).
+
+    Args:
+        size: Icon-Größe
+        bg_color: Hintergrundfarbe (default: schreibszene.ch brightblue #0eb1d2)
+
+    Returns:
+        PIL Image
+    """
+    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    # Runder Hintergrund
+    padding = 1
+    draw.ellipse([padding, padding, size-padding-1, size-padding-1], fill=bg_color)
+
+    # Folder-Form (Material Design Style)
+    margin = size // 4
+    folder_left = margin
+    folder_right = size - margin
+    folder_top = margin + 2
+    folder_bottom = size - margin
+
+    # Tab oben links
+    tab_width = (folder_right - folder_left) // 3
+    tab_height = 3
+
+    # Hauptordner-Körper
+    draw.rectangle(
+        [folder_left, folder_top + tab_height, folder_right, folder_bottom],
+        fill='white'
+    )
+
+    # Tab
+    draw.rectangle(
+        [folder_left, folder_top, folder_left + tab_width, folder_top + tab_height + 1],
+        fill='white'
+    )
+
+    return img
