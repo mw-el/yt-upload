@@ -54,7 +54,7 @@ from app.favorites import (
 )
 from app.asset_manager import AssetManagerWindow
 from app.svg_icons import load_youtube_icon, load_upload_icon, load_folder_icon
-from app.youtube_assets import find_video_by_title, replace_video_file
+from app.youtube_assets import find_video_by_title
 from PIL import ImageTk
 from app.config import COLORS
 
@@ -736,15 +736,6 @@ class BatchUploadApp:
         )
         self.upload_button.pack(side=LEFT)
 
-        # Replace if exists Checkbox (default: aktiviert)
-        self.replace_if_exists_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(
-            upload_frame,
-            text="Replace if exists (ersetzt vorhandene Videos mit gleichem Titel)",
-            variable=self.replace_if_exists_var,
-            bootstyle="success-round-toggle"
-        ).pack(side=LEFT, padx=(15, 0))
-
         # Status
         self.status_label = ttk.Label(
             upload_frame,
@@ -1274,65 +1265,55 @@ class BatchUploadApp:
                     profile_data = get_profile(profile_name, self.profiles)
                     status_cb, progress_cb = self._make_upload_callbacks(video, profile_name)
 
+                    # Wähle richtiges Video basierend auf Profil
+                    # social_subtitled → hardsubs, andere → softsubs oder Basis-Video
+                    if profile_name == "social_subtitled" and video.hardsubs_path:
+                        upload_video_path = video.hardsubs_path
+                    elif video.softsubs_path:
+                        upload_video_path = video.softsubs_path
+                    else:
+                        upload_video_path = video.video_path
+
                     # Füge Thumbnail zu Factsheet hinzu, falls vorhanden
                     factsheet_with_thumbnail = video.factsheet_data.copy()
-                    if video.thumbnail_path and 'thumbnail' not in factsheet_with_thumbnail:
-                        factsheet_with_thumbnail['thumbnail'] = video.thumbnail_path
+                    if video.thumbnail_path:
+                        # Überschreibe thumbnail wenn vorhanden (auch wenn bereits als dict mit file:null gesetzt)
+                        existing_thumb = factsheet_with_thumbnail.get('thumbnail')
+                        if existing_thumb is None:
+                            factsheet_with_thumbnail['thumbnail'] = video.thumbnail_path
+                        elif isinstance(existing_thumb, dict) and not existing_thumb.get('file'):
+                            # thumbnail.file ist null/leer → ersetze mit gefundenem Thumbnail
+                            factsheet_with_thumbnail['thumbnail'] = video.thumbnail_path
+                        elif isinstance(existing_thumb, str) and not existing_thumb:
+                            # Leerer String → ersetze
+                            factsheet_with_thumbnail['thumbnail'] = video.thumbnail_path
 
-                    # Replace if exists: Suche vorhandenes Video mit gleichem Titel
-                    video_id_to_replace = None
-                    if self.replace_if_exists_var.get():
-                        title = factsheet_with_thumbnail.get("snippet", {}).get("title", "")
-                        if title:
-                            try:
-                                existing_video = find_video_by_title(title)
-                                if existing_video:
-                                    video_id_to_replace = existing_video.get("id")
-                                    self.root.after(0, self._append_video_status, video, f"  → Video existiert, wird ersetzt (ID: {video_id_to_replace[:8]}...)")
-                            except Exception as e:
-                                # Fehler beim Suchen ignorieren, normaler Upload fortsetzen
-                                print(f"⚠ Fehler beim Suchen des Videos: {e}")
-
-                    # Wenn Replace-Modus und Video gefunden: Ersetze Video-Datei
-                    if video_id_to_replace:
+                    # Prüfe ob Video mit gleichem Titel bereits existiert
+                    title = factsheet_with_thumbnail.get("snippet", {}).get("title", "")
+                    if title:
                         try:
-                            # Ersetze Video-Datei
-                            def replace_progress_cb(current, total):
-                                percent = int((current / total) * 100)
-                                progress_cb({"progress": percent, "total": 100})
+                            existing_video = find_video_by_title(title)
+                            if existing_video:
+                                existing_id = existing_video.get("id", "")[:8]
+                                raise Exception(
+                                    f"Video existiert bereits (ID: {existing_id}...). "
+                                    f"Bitte erst im Asset-Manager löschen, dann neu hochladen."
+                                )
+                        except Exception as e:
+                            if "Video existiert bereits" in str(e):
+                                raise
+                            # Andere Fehler beim Suchen ignorieren
+                            print(f"⚠ Fehler beim Suchen des Videos: {e}")
 
-                            replace_video_file(video_id_to_replace, video.video_path, progress_callback=replace_progress_cb)
-
-                            # Erstelle UploadResult mit vorhandener Video-ID
-                            from app.uploader import UploadResult
-                            result = UploadResult(
-                                video_id=video_id_to_replace,
-                                video_path=video.video_path,
-                                srt_path=video.srt_path,
-                                profile=profile_name,
-                                title=title
-                            )
-                        except Exception as replace_error:
-                            # Falls Replace fehlschlägt, normalen Upload durchführen
-                            self.root.after(0, self._append_video_status, video, f"  → Replace fehlgeschlagen, normaler Upload...")
-                            result = upload(
-                                video_path=video.video_path,
-                                srt_path=video.srt_path,
-                                factsheet_data=factsheet_with_thumbnail,
-                                profile_data=profile_data,
-                                progress_callback=progress_cb,
-                                status_callback=status_cb
-                            )
-                    else:
-                        # Normaler Upload
-                        result = upload(
-                            video_path=video.video_path,
-                            srt_path=video.srt_path,
-                            factsheet_data=factsheet_with_thumbnail,
-                            profile_data=profile_data,
-                            progress_callback=progress_cb,
-                            status_callback=status_cb
-                        )
+                    # Upload durchführen
+                    result = upload(
+                        video_path=upload_video_path,
+                        srt_path=video.srt_path,
+                        factsheet_data=factsheet_with_thumbnail,
+                        profile_data=profile_data,
+                        progress_callback=progress_cb,
+                        status_callback=status_cb
+                    )
                     success_results.append(result)
                     self.batch_progress["success"] += 1
                     self._write_upload_log(video, profile_name, success=True, result=result)

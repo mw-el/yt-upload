@@ -351,7 +351,25 @@ def upload(
                 emit("thumbnail_start", filename=thumb_file.name)
                 print(f"🖼 Lade Thumbnail hoch: {thumb_file.name}")
 
-                media = MediaFileUpload(str(thumb_file), mimetype='image/jpeg')
+                upload_thumb_path = thumb_file
+                temp_jpeg = None
+
+                # Konvertiere PNG zu JPEG (YouTube hat Probleme mit großen PNGs)
+                if thumb_file.suffix.lower() == '.png':
+                    try:
+                        from PIL import Image
+                        temp_jpeg = thumb_file.parent / f"{thumb_file.stem}_upload.jpg"
+                        with Image.open(thumb_file) as img:
+                            # Konvertiere zu RGB (entfernt Alpha-Kanal)
+                            if img.mode in ('RGBA', 'LA', 'P'):
+                                img = img.convert('RGB')
+                            img.save(temp_jpeg, 'JPEG', quality=95)
+                        upload_thumb_path = temp_jpeg
+                        print(f"   → PNG zu JPEG konvertiert: {temp_jpeg.name}")
+                    except Exception as conv_err:
+                        print(f"   → PNG-Konvertierung fehlgeschlagen, verwende Original: {conv_err}")
+
+                media = MediaFileUpload(str(upload_thumb_path), mimetype='image/jpeg')
 
                 youtube.thumbnails().set(
                     videoId=video_id,
