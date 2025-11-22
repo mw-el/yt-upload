@@ -9,14 +9,27 @@ Minimalistische Desktop-App für automatisierte YouTube-Uploads mit präfix-basi
 
 ## Features
 
-- **Multi-Profil-Batch-Upload**: Mehrere Videos mit verschiedenen Profilen gleichzeitig hochladen
+### Upload-Modi
+
+- **Quick Upload**: Einzelne Videos direkt hochladen ohne JSON-Metadaten
+  - Automatische Titel aus Dateiname
+  - Flexible Privacy-Einstellungen (öffentlich/nicht gelistet/privat)
+  - 13 YouTube-Kategorien zur Auswahl
+  - Automatische Thumbnail-Generierung (erstes Frame)
+  - SRT-Auto-Erkennung
+
+- **Batch Upload**: Professioneller Multi-Profil-Upload für Podcasts/Serien
+  - Mehrere Videos mit verschiedenen Profilen gleichzeitig hochladen
+  - JSON-Metadaten mit vollständiger Kontrolle
+  - Profil-basierte Uploads mit Requirements
+  - Container-SRT-Extraktion
+
+### Allgemeine Features
+
 - **Favoriten-Verzeichnisse**: Schnellzugriff auf häufig genutzte Ordner
-- **Automatisches Datei-Matching**: Findet SRT- und JSON-Dateien basierend auf Video-Namenspräfix
-- **Container-SRT-Extraktion**: Extrahiert Untertitel automatisch aus Video-Container (ffmpeg)
-- **Automatische Thumbnail-Generierung**: Erstellt Thumbnail bei t=3s (ffmpeg)
-- **Profil-basierte Uploads**: Vordefinierte Profile mit Requirements (SRT, JSON)
+- **Automatisches Datei-Matching**: Findet SRT- und JSON-Dateien automatisch
+- **Automatische Thumbnail-Generierung**: Erstellt Thumbnails automatisch (ffmpeg)
 - **Profil-Präferenzen**: Speichert letzte Profil-Auswahl pro Video
-- **JSON-Schema-Validierung**: Prüft Metadaten vor Upload
 - **Asset-Manager**: Übersicht über bereits hochgeladene Videos inkl. Statistiken
 - **Moderne GUI**: ttkbootstrap mit Ubuntu-Font, responsives Layout
 - **Fail Fast**: Klare Fehlermeldungen bei Problemen
@@ -84,6 +97,7 @@ Danach erscheint "YouTube Upload Tool" im Application Launcher mit YouTube-Icon.
 │   ├── config.py           # Konfiguration & Environment-Check
 │   ├── favorites.py        # Favoriten-Verzeichnisse & Profil-Präferenzen
 │   ├── gui_batch.py        # Multi-Profil-Batch-GUI (Haupt-GUI)
+│   ├── quick_upload_dialog.py  # Quick-Upload-Dialog (ohne JSON)
 │   ├── matching.py         # Dateisuche (Präfix-basiert)
 │   ├── profiles.py         # Profil-Handling
 │   ├── factsheet_schema.py # JSON-Schema-Validierung
@@ -115,19 +129,46 @@ Danach erscheint "YouTube Upload Tool" im Application Launcher mit YouTube-Icon.
 
 ## Verwendung
 
-### 1. Videos auswählen
+### Einzel Upload (Einfacher Modus)
 
-**Option A: Favoriten-Buttons**
-Klicke auf einen Favoriten-Button (zeigt Verzeichnisnamen wie "Podcasts", "Videos", etc.) → öffnet Datei-Dialog im entsprechenden Verzeichnis.
+Für schnellen Upload einzelner Videos ohne JSON-Metadaten:
 
-**Option B: Manuell**
-Klicke auf **"+ Videos hinzufügen"** und navigiere zum Verzeichnis.
+1. **Klicke auf "Einzel Upload"** (grüner Button in der Toolbar)
+2. **Wähle Videos** mit "Videos hinzufügen…"
+3. **Konfiguriere Einstellungen:**
+   - Sichtbarkeit: Öffentlich / Nicht gelistet / Privat (Standard: Nicht gelistet)
+   - Kategorie: Standard "27 - Education" (änderbar)
+   - Sprache: z.B. "de-CH - Deutsch (Schweiz)"
+   - Titel: Automatisch aus Dateiname (mit `-` und `_` → Leerzeichen) oder eigene Eingabe bei Einzel-Datei
+4. **Klicke "▸ Hochladen"**
+
+**Automatisch:**
+
+- Titel wird aus Dateiname generiert (`-` und `_` werden zu Leerzeichen)
+- Thumbnail wird aus erstem Frame erstellt (ffmpeg erforderlich)
+- SRT-Dateien werden automatisch gesucht
+- Privacy ist "unlisted" (nicht in Suche, aber einbettbar)
+- Kategorie ist standardmäßig "Education"
+
+---
+
+### Batch Upload (Professioneller Modus)
+
+Für Podcasts/Serien mit mehreren Profilen und vollständiger Metadaten-Kontrolle:
+
+#### 1. Videos auswählen
+
+**Option A: Favoriten-Buttons (Podcast-Bündel-Uploads)**
+- Im Rahmen "Podcast-Bündel-Uploads" findest du die ersten 3 Favoriten
+- Klicke auf einen Favoriten-Button (zeigt Verzeichnisnamen) → öffnet Datei-Dialog im entsprechenden Verzeichnis
+- **Favoriten konfigurieren:** Klicke auf ⚙ (Gear-Icon) neben Favorit → wähle neues Verzeichnis
+
+**Option B: Ordner-Picker**
+Klicke auf **📁** (im gleichen Rahmen wie Favoriten) und navigiere zum Verzeichnis.
 
 **Tipp:** Halte `Strg` gedrückt für Multi-Select oder `Shift` für Bereichsauswahl.
 
-**Favoriten konfigurieren:** Klicke auf ● neben Favorit → wähle neues Verzeichnis. Der Button zeigt automatisch den Namen des ausgewählten Verzeichnisses.
-
-### 2. Automatisches Matching
+#### 2. Automatisches Matching
 
 Die App sucht automatisch nach passenden Dateien im selben Verzeichnis für **jedes** ausgewählte Video:
 
@@ -148,7 +189,7 @@ sample_MyVideo_20251102_150059.png              ← Thumbnail (bevorzugt)
 - Bei fehlender SRT: Automatische Extraktion aus softsubs-Video
 - Bei fehlendem Thumbnail: Generierung aus Video bei t=3s
 
-### 3. Metadaten-Format (*_yt_profile.json)
+#### 3. Metadaten-Format (*_yt_profile.json)
 
 **Wichtig:** Dateiname MUSS `*_yt_profile.json` sein!
 
@@ -203,7 +244,7 @@ sample_MyVideo_20251102_150059.png              ← Thumbnail (bevorzugt)
 
 **Siehe auch:** `docs/PROMPT_YT_METADATA.md` für LLM-Prompt zur Generierung
 
-### 4. Profile wählen
+#### 4. Profile wählen
 
 **Pro Video einzeln:**
 1. Wähle Video in Liste aus
@@ -219,7 +260,7 @@ Profile mit fehlenden Requirements werden automatisch deaktiviert (z.B. "public_
 
 **Präferenzen:** Profil-Auswahl wird pro Video-Basename gespeichert und beim nächsten Mal wiederhergestellt.
 
-### 5. Batch-Upload starten
+#### 5. Batch-Upload starten
 
 Klicke auf **"▸ Alle hochladen"**.
 
@@ -241,12 +282,23 @@ my_video.mp4
 ● public_youtube: abc12345...
 ```
 
+---
+
 ### Assets einsehen und verwalten
 
-- Klicke auf **📚 Assets** (rechts neben den Favoriten), um ein zusätzliches Fenster mit allen bereits hochgeladenen Videos zu öffnen.
-- Die Liste zeigt Thumbnail, Titel, Upload-Datum, Sichtbarkeit und Aufrufe; über **Details** erhältst du weitere Metadaten und Statistiken.
-- Buttons erlauben den direkten Sprung zum Video bzw. zu YouTube Studio; ein Kopier-Button legt die Video-URL in die Zwischenablage.
-- Die Daten kommen live aus der YouTube Data API – mit **Aktualisieren** aktualisierst du die Übersicht jederzeit.
+- Klicke auf **Videos** (rechter YouTube-Button), um ein zusätzliches Fenster mit allen bereits hochgeladenen Videos zu öffnen.
+- Die Liste zeigt Thumbnail, Titel, Upload-Datum, Sichtbarkeit und Aufrufe; durch Klick auf Video erhältst du weitere Metadaten und Statistiken.
+- **Video-ID im Header:** Upload-ID wird direkt neben dem Titel angezeigt (auch im zugeklappten Zustand)
+- **Multi-Profil-Gruppierung:** Videos mit ähnlichem Titel (z.B. neutral_embed, public_youtube, social_subtitled) werden automatisch gruppiert
+- **Thumbnail-Upload:** Klicke auf das Upload-Icon 📤 (orange, unten rechts im Thumbnail) um Thumbnails zu ändern
+  - Bei gruppierten Videos: Upload für alle Varianten gleichzeitig
+- **Link-Icon:** Klicke auf 🔗-Icon (oben rechts) um neutrale Embed-URL zu kopieren
+- **Löschen-Button:** 🗑-Button im Header löscht Video(s) direkt
+  - Bei gruppierten Videos: Löscht alle Varianten nach doppelter Bestätigung
+- **ForKids/Embeddable:** Toggle-Checkboxen zum schnellen Ändern der Video-Flags
+- **MD Export:** Exportiert Markdown-Tabelle mit Videotiteln und Unlisted-IDs
+- Buttons erlauben den direkten Sprung zum Video bzw. zu YouTube Studio
+- Die Daten kommen live aus der YouTube Data API – mit **Aktualisieren** aktualisierst du die Übersicht jederzeit
 
 ---
 
@@ -492,6 +544,20 @@ python main.py
 - [x] Profil-Präferenzen-Speicherung
 - [x] Companion-Status-Anzeige (● ◐ ○)
 
+### Version 4.2 - Einzel Upload ✅ (AKTUELL)
+
+- [x] Einzel-Upload-Dialog für einzelne Videos (ehem. "Quick Upload")
+- [x] Upload ohne JSON-Metadaten
+- [x] Automatische Titel-Generierung aus Dateiname (mit `-`/`_` → Leerzeichen)
+- [x] Multi-File Upload (Titel nur bei Einzel-Datei editierbar)
+- [x] Flexible Privacy-Einstellungen
+- [x] Kategorien- und Sprach-Auswahl (Standard: Education)
+- [x] Automatische Thumbnail-Generierung (erstes Frame)
+- [x] GUI-Redesign mit schreibszene.ch-Branding
+- [x] Material Design Icons (weiß auf Farbe)
+- [x] Asset-Manager mit Thumbnail-Upload für gruppierte Videos
+- [x] Koordinaten-basierte Icon-Erkennung für Multi-Icon-Thumbnails
+
 ### Version 5.0 - Erweiterte Features (Geplant)
 - [ ] Playlist-Zuordnung
 - [ ] Preview-Funktion (Dry-Run)
@@ -518,8 +584,8 @@ Bei Fragen oder Problemen:
 
 ---
 
-**Version:** 4.0.0 (Multi-Profil & Automation)
-**Status:** ✅ Production Ready - Multi-Profil-Upload, Container-SRT-Extraktion, automatische Thumbnails
-**Abhängigkeiten:** Python 3.11, ffmpeg/ffprobe (optional für SRT/Thumbnail)
+**Version:** 4.3.0 (Asset-Manager mit Löschen, MD-Export, SRT-Logik überarbeitet)
+**Status:** ✅ Production Ready - Einzel Upload, Multi-Profil-Upload, Asset-Manager mit Lösch-Funktion und MD-Export
+**Abhängigkeiten:** Python 3.11, ffmpeg/ffprobe (erforderlich für SRT-Extraktion/Thumbnail)
 **Getestet auf:** Ubuntu 24.04
-**Letzte Aktualisierung:** 2025-11-13
+**Letzte Aktualisierung:** 2025-11-22

@@ -4,6 +4,8 @@ Implementiert Video-, Untertitel- und Thumbnail-Upload zu YouTube.
 """
 
 import os
+import subprocess
+import tempfile
 from typing import Dict, Any, Tuple, Optional, Callable, List
 from pathlib import Path
 
@@ -13,6 +15,55 @@ from googleapiclient.errors import HttpError
 from app.auth import create_youtube_client, AuthError
 from app.config import CLIENT_SECRETS_PATH, TOKEN_PATH
 from app.source_map import update_source_folder
+
+
+def extract_srt_from_video(video_path: str) -> Optional[str]:
+    """
+    Extrahiert SRT-Untertitel aus einem Video-Container (softsubs).
+
+    Args:
+        video_path: Pfad zum Video mit eingebetteten Untertiteln
+
+    Returns:
+        Pfad zur extrahierten SRT-Datei oder None bei Fehler
+    """
+    video_file = Path(video_path)
+    if not video_file.exists():
+        return None
+
+    # Erstelle temporäre SRT-Datei im selben Verzeichnis
+    srt_path = video_file.parent / f"{video_file.stem}_extracted.srt"
+
+    try:
+        # FFmpeg-Befehl zum Extrahieren der ersten Untertitelspur
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", str(video_path),
+            "-map", "0:s:0",
+            "-c:s", "srt",
+            str(srt_path)
+        ]
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        if result.returncode == 0 and srt_path.exists():
+            return str(srt_path)
+        else:
+            # Keine Untertitelspur vorhanden oder Fehler
+            return None
+
+    except subprocess.TimeoutExpired:
+        return None
+    except FileNotFoundError:
+        # FFmpeg nicht installiert
+        return None
+    except Exception:
+        return None
 
 
 class UploadError(Exception):
@@ -241,9 +292,12 @@ def upload(
         raise UploadError(f"Unerwarteter Fehler beim Video-Upload: {str(e)}")
 
     # ===========================
-    # 4. Untertitel hochladen (falls vorhanden)
+    # 4. Untertitel hochladen (falls Profil requires_srt=true)
     # ===========================
-    if srt_path and Path(srt_path).exists():
+    # Hardsubs-Profile (requires_srt=false) brauchen keine separate SRT-Datei
+    requires_srt = profile_data.get('requires_srt', True)
+
+    if requires_srt and srt_path and Path(srt_path).exists():
         try:
             emit("captions_start", filename=Path(srt_path).name)
             print(f"📝 Lade Untertitel hoch: {Path(srt_path).name}")

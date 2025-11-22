@@ -1,7 +1,7 @@
 # Architektur-Dokumentation: YouTube Upload Tool
 
-**Version:** 4.0 (Multi-Profil & Automation)
-**Letzte Aktualisierung:** 2025-11-13
+**Version:** 4.3 (Asset-Manager Erweiterungen & SRT-Logik)
+**Letzte Aktualisierung:** 2025-11-22
 
 ## Überblick
 
@@ -45,7 +45,7 @@ from app.gui_batch import run_app
 ---
 
 ### 3. `app/gui_batch.py`
-**Verantwortlichkeit:** Batch-Upload-Benutzeroberfläche
+**Verantwortlichkeit:** Haupt-GUI mit Batch-Upload und Quick-Upload
 
 **Features:**
 - Multi-Video-Auswahl mit Favoriten-Verzeichnissen
@@ -54,6 +54,41 @@ from app.gui_batch import run_app
 - Manuelle File-Picker für fehlende JSON/SRT (📁-Buttons)
 - Reload-Button (↻) pro Video
 - Companion-Processing (Container-SRT, Thumbnail-Gen)
+- Quick-Upload-Button öffnet separaten Dialog
+
+---
+
+### 4. `app/quick_upload_dialog.py`
+
+**Verantwortlichkeit:** Quick-Upload-Dialog für einfachen Video-Upload
+
+**Features (Version 4.2):**
+
+- Multi-Video-Auswahl ohne JSON-Metadaten
+- Automatische Titel-Generierung aus Dateiname
+- Flexible Privacy-Einstellungen (öffentlich/unlisted/privat)
+- 13 YouTube-Kategorien zur Auswahl
+- 6 Sprach-Optionen
+- Automatische Thumbnail-Generierung (erstes Frame, t=0s)
+- SRT-Auto-Erkennung
+- Live-Fortschrittsanzeige pro Video
+
+**QuickVideoItem-Dataclass:**
+```python
+@dataclass
+class QuickVideoItem:
+    video_path: str
+    srt_path: Optional[str] = None
+    thumbnail_path: Optional[str] = None
+    status: str = "Bereit"
+```
+
+**Standard-Einstellungen:**
+
+- Privacy: `unlisted` (nicht in Suche, aber einbettbar)
+- Kategorie: `22 - People & Blogs`
+- Sprache: `de-CH - Deutsch (Schweiz)`
+- Titel: Automatisch aus Dateiname
 
 **VideoItem-Dataclass:**
 ```python
@@ -71,7 +106,7 @@ class VideoItem:
 
 ---
 
-### 4. `app/matching.py`
+### 5. `app/matching.py`
 **Verantwortlichkeit:** Dateisuche basierend auf Namenskonventionen
 
 **Neue Funktionen (Version 4.0):**
@@ -97,7 +132,7 @@ find_companion_files_multi(video_path) -> Tuple[List[str], List[str]]
 
 ---
 
-### 5. `app/companion.py`
+### 6. `app/companion.py`
 **Verantwortlichkeit:** ffmpeg-basierte Video-Operationen
 
 **Funktionen:**
@@ -130,7 +165,7 @@ get_video_companion_files(video_path) -> dict
 
 ---
 
-### 6. `app/factsheet_schema.py`
+### 7. `app/factsheet_schema.py`
 **Verantwortlichkeit:** JSON-Schema-Validierung
 
 **Schema (Version 4.0):**
@@ -166,7 +201,7 @@ FACTSHEET_SCHEMA = {
 
 ---
 
-### 7. `app/profiles.py`
+### 8. `app/profiles.py`
 **Verantwortlichkeit:** Upload-Profil-Verwaltung
 
 **Profil-Format (YAML):**
@@ -186,14 +221,15 @@ profile_name:
     rel: "0"
 ```
 
-**Standard-Profile:**
-- `neutral_embed` - Unlisted, für Website-Embedding
-- `public_youtube` - Public, benötigt SRT
-- `social_subtitled` - Private, mit eingebrannten Untertiteln
+**Standard-Profile (Version 4.3):**
+
+- `neutral_embed` - Unlisted, für Website-Embedding, **requires_srt: true**
+- `public_youtube` - Public, **requires_srt: true**
+- `social_subtitled` - Private, Hardsubs, **requires_srt: false** (keine SRT hochladen)
 
 ---
 
-### 8. `app/favorites.py`
+### 9. `app/favorites.py`
 **Verantwortlichkeit:** Favoriten-Verzeichnisse & Profil-Präferenzen
 
 **Funktionen:**
@@ -210,15 +246,29 @@ save_profile_preferences(prefs: dict)
 
 ---
 
-### 9. `app/uploader.py`
+### 10. `app/uploader.py`
+
 **Verantwortlichkeit:** YouTube-API-Upload
 
 **Vollständig implementiert (Version 2.0+):**
 - Video-Upload mit Metadaten
-- Untertitel-Upload (SRT)
+- Untertitel-Upload (SRT) - **Profil-abhängig** (Version 4.3)
 - Thumbnail-Upload
 - Kapitel in Description
 - Fehlerbehandlung
+- SRT-Extraktion aus Video-Container (FFmpeg)
+
+**Neue Funktion (Version 4.3):**
+```python
+extract_srt_from_video(video_path: str) -> Optional[str]
+# Extrahiert SRT aus Video-Container (softsubs)
+# Verwendet FFmpeg: ffmpeg -i video.mp4 -map 0:s:0 -c:s srt output.srt
+```
+
+**SRT-Upload-Logik (Version 4.3):**
+- SRT wird nur hochgeladen wenn `profile_data.get('requires_srt') == True`
+- Hardsubs-Profile (`social_subtitled`) laden keine SRT hoch
+- SRT wird aus softsubs-Video extrahiert (korrektes Timing inkl. Intro)
 
 ```python
 upload(
@@ -232,7 +282,8 @@ upload(
 
 ---
 
-### 10. `app/auth.py`
+### 11. `app/auth.py`
+
 **Verantwortlichkeit:** OAuth2-Authentifizierung
 
 **Funktionen:**
@@ -244,7 +295,63 @@ upload(
 
 ---
 
-### 11. `app/tooltips.py`
+### 12. `app/youtube_assets.py`
+
+**Verantwortlichkeit:** YouTube Data API für Asset-Manager
+
+**Funktionen (Version 4.1+):**
+
+```python
+fetch_uploaded_videos(max_results: int = 25) -> List[Dict]
+# Ruft hochgeladene Videos des authentifizierten Kanals ab
+
+update_video_metadata(video_id, title, description, privacy_status, tags, publish_at)
+# Aktualisiert Metadaten eines bestehenden Videos
+
+update_video_status_flags(video_id, made_for_kids, embeddable)  # Version 4.3
+# Aktualisiert ForKids und Embeddable Flags
+
+upload_video_thumbnail(video_id, thumbnail_path)
+# Lädt Thumbnail für bestehendes Video hoch
+
+delete_video(video_id)
+# Löscht Video permanent
+
+find_video_by_title(title, max_results=50)
+# Sucht Video anhand des exakten Titels
+```
+
+---
+
+### 13. `app/asset_manager.py`
+
+**Verantwortlichkeit:** GUI-Fenster für Asset-Übersicht
+
+**Features (Version 4.3):**
+
+- Video-Liste mit Thumbnails und Statistiken
+- Multi-Profil-Gruppierung (Videos mit gleichem Titel)
+- Video-ID neben Titel im Header
+- ForKids/Embeddable Checkboxen (einzeln und gruppiert)
+- Löschen-Button im Header (🗑)
+- Gruppiertes Löschen mit doppelter Bestätigung
+- MD Export (Markdown-Tabelle mit Titeln und Unlisted-IDs)
+- Thumbnail-Upload (einzeln und gruppiert)
+- Link-Icon für Embed-URL-Kopieren
+
+**Wichtige Methoden:**
+
+```python
+_delete_video(video_id, title)  # Löscht einzelnes Video
+_delete_grouped_videos(videos, title)  # Löscht alle Videos einer Gruppe
+_update_video_flags(video_id, made_for_kids, embeddable)
+_update_grouped_video_flags(videos, made_for_kids, embeddable)
+_export_markdown()  # Exportiert MD-Tabelle
+```
+
+---
+
+### 14. `app/tooltips.py`
 **Verantwortlichkeit:** Hover-Tooltips für GUI
 
 **Features:**
@@ -375,6 +482,6 @@ sample_MyVideo_20251102_150059.png              # Thumbnail (bevorzugt)
 
 ---
 
-**Status:** ✅ Production Ready - Multi-Profil-Upload, Container-SRT-Extraktion, automatische Thumbnails
-**Version:** 4.0.0
-**Letzte Aktualisierung:** 2025-11-13
+**Status:** ✅ Production Ready - Multi-Profil-Upload, Asset-Manager mit Löschen/Export, SRT-Profil-Logik
+**Version:** 4.3.0
+**Letzte Aktualisierung:** 2025-11-22

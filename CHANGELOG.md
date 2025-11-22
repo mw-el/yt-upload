@@ -4,6 +4,131 @@ Alle wesentlichen Änderungen am Projekt werden hier dokumentiert.
 
 ---
 
+## [4.3.0] - 2025-11-22
+
+### ✨ Neue Features
+
+#### Asset-Manager Verbesserungen
+- **Video-ID neben Titel:** Zeigt Upload-ID direkt im zugeklappten Akkordeon-Header
+  - Gruppierte Videos: Unlisted Video-ID wird angezeigt
+  - Einzelne Videos: Video-ID in grauer Schrift neben Titel
+- **Löschen-Button im Header:** 🗑-Button direkt im zugeklappten Zustand sichtbar
+  - Gruppierte Videos: Löscht alle Varianten nach doppelter Bestätigung
+  - Einzelne Videos: Löscht einzelnes Video
+- **MD Export:** Neuer Button exportiert Markdown-Tabelle mit Videotiteln und Unlisted-IDs
+- **ForKids/Embeddable Checkboxen:** Toggle-Buttons für gruppierte und einzelne Videos
+  - Gruppierte Videos: Aktualisiert alle Videos in der Gruppe gleichzeitig
+
+#### SRT-Upload-Logik überarbeitet
+- **Profil-basierte SRT-Uploads:** SRT wird nur hochgeladen wenn `requires_srt: true` im Profil
+- **Hardsubs-Profil ohne SRT:** `social_subtitled` lädt keine SRT hoch (eingebrannte Untertitel)
+- **Softsubs-Extraktion:** SRT wird aus softsubs-Video extrahiert (korrekte Timing inkl. Intro)
+- **FFmpeg-basierte Extraktion:** Neue `extract_srt_from_video()` Funktion in uploader.py
+
+### 🐛 Bugfixes
+
+#### SRT-Synchronisation
+- **Problem:** Original-SRTs hatten Timing-Offset weil Video-Intro nicht berücksichtigt
+- **Lösung:** SRT wird aus softsubs-Video extrahiert (bereits mit korrektem Timing)
+
+### 📚 Dokumentation
+- **profiles.yaml aktualisiert:**
+  - `neutral_embed`: requires_srt: true (SRT-Upload aktiviert)
+  - `public_youtube`: requires_srt: true (SRT-Upload aktiviert)
+  - `social_subtitled`: requires_srt: false (keine SRT bei Hardsubs)
+
+---
+
+## [4.2.2] - 2025-11-21
+
+### ✨ Neue Features
+
+#### Asset-Manager: Thumbnail-Upload für gruppierte Videos
+- **Multi-Icon Thumbnails:** Gruppierte Videos zeigen Link-Icon (🔗 oben rechts) + Upload-Icon (📤 unten rechts)
+- **Koordinaten-basierte Erkennung:** Klick-Position bestimmt Funktion (Link kopieren vs. Thumbnail uploaden)
+- **Bulk-Upload:** Thumbnail-Upload für alle Videos in Gruppe gleichzeitig
+- **Bestätigungs-Dialog:** Fragt bei mehreren Videos nach Bestätigung
+
+#### GUI-Redesign (schreibszene.ch Branding)
+- **Favoriten-Layout:** Alle 4 Buttons (3 Favoriten + 📁) in gemeinsamem Rahmen "Podcast-Bündel-Uploads"
+- **Gear-Icon für Favoriten:** ⚙-Button statt separatem Layout
+- **Material Design Icons:** Weiß auf Farbe (brightblue #0eb1d2, brightgreen #98ce00, orange #f7b33b)
+- **Button-Texte angepasst:**
+  - "Quick Upload" → "Einzel Upload"
+  - "📚 Assets" → "Videos"
+  - YouTube-Buttons: "YT-Kanal", "YT-Studio", "Videos" (ohne Icons)
+- **Cleanup:** "YouTube Upload Tool - Batch Mode" Header entfernt, Video-Count-Label entfernt
+- **Schwarze Trennlinien:** Im Asset-Manager zwischen Video-Einträgen (2px, #000000)
+
+#### Einzel Upload: Multi-File Improvements
+- **Titel-Feld deaktiviert:** Bei mehreren Dateien automatisch deaktiviert
+- **Automatische Titel-Generierung:** `-` und `_` werden zu Leerzeichen konvertiert
+- **Default-Kategorie:** Education (27) statt People & Blogs (22)
+- **Vereinfachte Beschreibung:** Nur Titel, kein "Hochgeladen mit Quick Upload"-Text
+
+### 🐛 Bugfixes
+
+#### Thumbnail-Upload Button (Asset-Manager)
+- **Problem:** Upload-Icon bei gruppierten Videos nicht klickbar (nur Link-Funktion aktiv)
+- **Lösung:** Neue Methode `_handle_grouped_thumbnail_click()` mit Koordinaten-Erkennung
+- **Verhalten:** Link-Icon (oben rechts) kopiert Embed-URL, Upload-Icon (unten rechts) öffnet Dateiauswahl
+
+### 📚 Dokumentation
+- **README.md:** Alle Button-Texte und Features aktualisiert
+- **README.md:** Asset-Manager Beschreibung mit Icon-Funktionen erweitert
+- **README.md:** Version auf 4.2.1 aktualisiert
+
+---
+
+## [4.2.1] - 2025-11-19
+
+### 🐛 Bugfixes
+
+#### Anwendungs-Beendigung
+- **Process Cleanup:** Anwendung beendet sich jetzt ordnungsgemäß beim Schließen des Fensters
+- **WM_DELETE_WINDOW Handler:** Verhindert, dass Prozesse im Dock verbleiben
+- **Sauberes Shutdown:** Ruft `quit()`, `destroy()` und `sys.exit(0)` auf
+
+#### Upload-Status-Meldungen
+- **Detaillierte Status-Anzeige:** Verbesserte Status-Meldungen während des Uploads
+- **Video-Upload:** "Lade Video hoch: [Dateiname]" → "Video-Upload erfolgreich!"
+- **Untertitel-Upload:** "Lade Untertitel hoch: [Dateiname]" → "Untertitel-Upload erfolgreich"
+- **Thumbnail-Upload:** "Lade Thumbnail hoch: [Dateiname]" → "Thumbnail-Upload erfolgreich"
+- **Klare Fehlermeldungen:** Explizite Fehlermeldungen für jeden Upload-Schritt
+
+---
+
+## [4.2.0] - 2025-11-19
+
+### ✨ Neue Features
+
+#### Quick Upload Dialog
+
+- **Quick Upload Modus:** Separater Dialog für unkomplizierten Upload einzelner Videos
+- **Keine JSON-Metadaten erforderlich:** Videos können direkt hochgeladen werden
+- **Automatische Titel-Generierung:** Verwendet Dateiname als Standardtitel (überschreibbar)
+- **Automatische Thumbnail-Generierung:** Erstes Frame des Videos (t=0s)
+- **Flexible Privacy-Einstellungen:** Öffentlich / Nicht gelistet / Privat
+- **Kategorien & Sprachen:** 13 YouTube-Kategorien und 6 Sprachen zur Auswahl
+- **SRT-Auto-Erkennung:** Sucht automatisch nach passenden Untertitel-Dateien
+- **Multi-Video-Upload:** Mehrere Videos auf einmal auswählen und hochladen
+- **Fortschrittsanzeige:** Live-Upload-Status und Fehlerbehandlung pro Video
+
+#### Standard-Einstellungen (Quick Upload)
+
+- **Privacy:** "Nicht gelistet" (nicht in Suche, aber einbettbar)
+- **Kategorie:** "22 - People & Blogs"
+- **Sprache:** "de-CH - Deutsch (Schweiz)"
+- **Titel:** Automatisch aus Dateiname
+- **Thumbnail:** Erstes Frame (ffmpeg erforderlich)
+
+### 🗂️ Code-Struktur
+
+- **quick_upload_dialog.py:** Neue Modul-Datei für Quick-Upload-Dialog
+- **Integration in gui_batch.py:** "Quick Upload…" Button in Favoriten-Toolbar
+
+---
+
 ## [4.1.0] - 2025-11-16
 
 ### ✨ Neue Features

@@ -1,8 +1,8 @@
 # Datei-Namenskonventionen: YouTube Upload Tool
 
-**Version:** 4.0.0
-**Letzte Aktualisierung:** 2025-11-13
-**Status:** 🔧 In Development - Patterns werden erweitert
+**Version:** 4.3.0
+**Letzte Aktualisierung:** 2025-11-22
+**Status:** ✅ Stabil - SRT-Extraktion aus Softsubs-Video
 
 ---
 
@@ -95,8 +95,17 @@ die sonnenseite des klischees.srt                    ✓ (mit Leerzeichen)
 ```
 
 **Priorität:**
+
 1. Externe SRT-Datei (wenn gefunden)
 2. Container-SRT aus softsubs-Video (automatisch extrahiert)
+
+**Wichtig (Version 4.3):** SRT wird aus dem softsubs-Video extrahiert, weil dort das Timing bereits korrekt ist (inkl. Intro). Original-SRTs haben oft einen Timing-Offset.
+
+**SRT-Upload-Logik:**
+
+- `neutral_embed`: SRT wird hochgeladen (requires_srt: true)
+- `public_youtube`: SRT wird hochgeladen (requires_srt: true)
+- `social_subtitled`: Keine SRT (requires_srt: false, Hardsubs haben eingebrannte UT)
 
 **Hinweis:** Leerzeichen in Dateinamen sind erlaubt!
 
@@ -307,7 +316,15 @@ get_video_companion_files(video_path: str) -> dict
 
 ## Änderungshistorie
 
+### 2025-11-22 (Version 4.3.0)
+
+- SRT-Upload-Logik überarbeitet: Profil-abhängig (`requires_srt`)
+- SRT wird aus softsubs-Video extrahiert (korrektes Timing)
+- `social_subtitled` lädt keine SRT hoch (Hardsubs)
+- Neue Funktion: `extract_srt_from_video()` in uploader.py
+
 ### 2025-11-13 (Version 4.0.0)
+
 - Initiale Dokumentation erstellt
 - `_extract_base_name()` implementiert (iteratives Suffix-Entfernen)
 - Thumbnail-Pattern `{basis}*_thumbnail.png` hinzugefügt
@@ -316,7 +333,7 @@ get_video_companion_files(video_path: str) -> dict
 ---
 
 **Nächste Schritte:**
+
 1. Thumbnail-Pattern erweitern oder Generierungs-Namen anpassen
 2. JSON-Fallback-Pattern evaluieren
 3. Tests schreiben für alle Matching-Funktionen
-4. User-Dokumentation (README) aktualisieren
