@@ -44,6 +44,7 @@ social_subtitled:
     Private Variante mit eingebrannten Untertiteln.
     Ideal für Social-Media-Veröffentlichungen ausserhalb YouTube.
   default_selected: false
+  prevent_duplicates: false  # erlaubt Upload trotz gleichem Titel (separate Social-Version)
   requires_srt: false
   requires_json: true
   status:

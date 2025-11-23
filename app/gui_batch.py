@@ -53,7 +53,12 @@ from app.favorites import (
     save_profile_preferences
 )
 from app.asset_manager import AssetManagerWindow
-from app.svg_icons import load_youtube_icon, load_upload_icon, load_folder_icon
+from app.svg_icons import (
+    load_youtube_icon,
+    load_upload_icon,
+    load_folder_icon,
+    load_close_icon
+)
 from app.youtube_assets import find_video_by_title
 from PIL import ImageTk
 from app.config import COLORS
@@ -237,6 +242,8 @@ class BatchUploadApp:
         self.video_rows: List[dict] = []
         self.initial_auth_done = False
         self.auth_check_running = False
+        self.auth_popup = None
+        self.ui_icons = {}
         self.batch_progress = {"current": 0, "total": 0, "success": 0, "failure": 0}
         self.last_directory_selection = str(Path.home())
         self.asset_window = None
@@ -360,26 +367,29 @@ class BatchUploadApp:
         folder_container = ttk.Frame(favorites_container)
         folder_container.pack(side=LEFT, padx=2)
 
-        # Lade Folder-Icon
-        folder_icon_pil = load_folder_icon(size=28, bg_color=szbrightblue)
+        # Lade Folder-Icon (flach)
+        folder_icon_pil = load_folder_icon(size=22, fill_color="white")
         self.folder_icon = ImageTk.PhotoImage(folder_icon_pil)
 
         folder_btn = ttk.Button(
             folder_container,
             image=self.folder_icon,
             command=self._add_folders,
-            bootstyle=PRIMARY
+            bootstyle=PRIMARY,
+            width=4,
+            padding=(6, 4)
         )
         folder_btn.pack()
 
         # Einzel Upload Button (ohne Rahmen, auf gleicher Höhe)
-        ttk.Button(
+        single_btn = ttk.Button(
             self.favorites_frame,
             text="Einzel Upload",
             command=self._open_quick_upload,
             bootstyle=SUCCESS,
-            padding=(10, 5)
-        ).pack(side=LEFT, padx=(10, 0))
+            padding=(8, 4)
+        )
+        single_btn.pack(side=LEFT, padx=(10, 0), pady=(6, 0))
 
         # YouTube-Rahmen (rechts)
         youtube_container = ttk.Labelframe(
@@ -418,17 +428,6 @@ class BatchUploadApp:
     def _create_video_list(self, parent):
         """Erstellt Video-Tabelle mit Thumbnails, Dateien und Profil-Checkboxen."""
 
-        # Header mit "Liste leeren" Button rechts
-        list_header = ttk.Frame(parent)
-        list_header.pack(fill=X, pady=(0, 5))
-
-        ttk.Button(
-            list_header,
-            text="× Liste leeren",
-            command=self._clear_videos,
-            bootstyle=SECONDARY
-        ).pack(side=RIGHT)
-
         list_frame = ttk.Labelframe(
             parent,
             text="Videos",
@@ -453,33 +452,53 @@ class BatchUploadApp:
         canvas.pack(side=LEFT, fill=BOTH, expand=YES)
         scrollbar.pack(side=RIGHT, fill=Y)
 
-        # Header-Row
-        header_frame = ttk.Frame(self.video_table_frame)
-        header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 5))
-
-        ttk.Label(header_frame, text="Thumbnail", font=(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, "bold")).grid(row=0, column=0, padx=5, sticky="w")
-        ttk.Label(header_frame, text="Video + Dateien", font=(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, "bold")).grid(row=0, column=1, padx=5, sticky="w")
-        ttk.Label(header_frame, text="Profile", font=(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, "bold")).grid(row=0, column=2, padx=5, sticky="w")
-        ttk.Label(header_frame, text="↻", font=(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, "bold")).grid(row=0, column=3, padx=5)
-        ttk.Label(header_frame, text="✕", font=(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, "bold")).grid(row=0, column=4, padx=5)
-
         # Grid-Konfiguration
-        self.video_table_frame.columnconfigure(0, weight=0, minsize=self.THUMB_DISPLAY_WIDTH + 20)   # Thumbnail
+        self.video_table_frame.columnconfigure(0, weight=0, minsize=self.THUMB_DISPLAY_WIDTH + 10)   # Thumbnail
         self.video_table_frame.columnconfigure(1, weight=3, minsize=300)  # Video
         self.video_table_frame.columnconfigure(2, weight=2, minsize=200)  # Profile
         self.video_table_frame.columnconfigure(3, weight=0, minsize=60)   # Reload
-        self.video_table_frame.columnconfigure(4, weight=0, minsize=60)   # Remove
 
         # Storage für Video-Rows
         self.video_rows = []  # Liste von dict mit widgets
 
     def _create_video_row(self, video: VideoItem, row_index: int):
         """Erstellt eine Row in der Video-Tabelle."""
-        row_num = row_index + 1  # +1 wegen Header
+        row_num = row_index
 
-        # Spalte 0: Thumbnail
-        thumb_label = ttk.Label(self.video_table_frame, text="[Thumb]")
-        thumb_label.grid(row=row_num, column=0, padx=5, pady=5, sticky="w")
+        # Spalte 0: Thumbnail + Delete Overlay
+        thumb_frame = tk.Frame(self.video_table_frame, width=self.THUMB_DISPLAY_WIDTH, height=self.THUMB_DISPLAY_WIDTH)
+        thumb_frame.grid_propagate(False)
+        thumb_frame.grid(row=row_num, column=0, padx=5, pady=5, sticky="w")
+
+        thumb_label = ttk.Label(thumb_frame, text="[Thumb]")
+        thumb_label.place(x=0, y=0)
+
+        close_icon_pil = load_close_icon(size=18, fill_color="#888888")
+        close_icon_hover_pil = load_close_icon(size=18, fill_color=COLORS["szred"])
+        close_icon = ImageTk.PhotoImage(close_icon_pil)
+        close_icon_hover = ImageTk.PhotoImage(close_icon_hover_pil)
+        self.ui_icons.setdefault("close", []).extend([close_icon, close_icon_hover])
+
+        def on_remove():
+            if messagebox.askyesno("Video entfernen", "Diesen Upload aus der Liste entfernen?"):
+                self._remove_video(video)
+
+        remove_btn = ttk.Button(
+            thumb_frame,
+            image=close_icon,
+            command=on_remove,
+            style="Toolbutton"
+        )
+        remove_btn.place(x=self.THUMB_DISPLAY_WIDTH - 24, y=4)
+
+        def enter(_):
+            remove_btn.configure(image=close_icon_hover)
+
+        def leave(_):
+            remove_btn.configure(image=close_icon)
+
+        remove_btn.bind("<Enter>", enter)
+        remove_btn.bind("<Leave>", leave)
 
         # Spalte 1: Video + Dateien mit File-Picker-Buttons
         video_info_frame = ttk.Frame(self.video_table_frame)
@@ -586,24 +605,13 @@ class BatchUploadApp:
         )
         reload_btn.grid(row=row_num, column=3, padx=5, pady=5)
 
-        # Spalte 4: Remove-Button
-        remove_btn = ttk.Button(
-            self.video_table_frame,
-            text="✕",
-            command=lambda v=video: self._remove_video(v),
-            bootstyle=DANGER,
-            width=3
-        )
-        remove_btn.grid(row=row_num, column=4, padx=5, pady=5)
-
         # Speichere Row-Widgets
         return {
             "thumb": thumb_label,
             "video": video_name_label,
             "profile_frame": profile_frame,
             "profile_vars": profile_widgets,
-            "reload_btn": reload_btn,
-            "remove_btn": remove_btn
+            "reload_btn": reload_btn
         }
 
     def _on_profile_check_toggled(self, video: VideoItem, profile_name: str, var: tk.BooleanVar):
@@ -726,6 +734,16 @@ class BatchUploadApp:
         upload_frame = ttk.Frame(parent)
         upload_frame.pack(fill=X, pady=(15, 0))
 
+        # Manueller Auth-Trigger
+        self.auth_button = ttk.Button(
+            upload_frame,
+            text="YouTube-Anmeldung starten",
+            command=self._start_manual_auth,
+            bootstyle=DANGER,
+            width=26
+        )
+        self.auth_button.pack(side=LEFT, padx=(0, 10))
+
         self.upload_button = ttk.Button(
             upload_frame,
             text="▸ Alle Videos hochladen",
@@ -753,20 +771,52 @@ class BatchUploadApp:
         self.auth_check_running = True
         threading.Thread(target=self._initial_auth_worker, daemon=True).start()
 
+    def _start_manual_auth(self):
+        """Erzwingt OAuth-Flow (z.B. um Konto zu wechseln)."""
+        if self.auth_check_running:
+            messagebox.showinfo(
+                "YouTube-Authentifizierung",
+                "Auth läuft bereits. Bitte kurz warten."
+            )
+            return
+
+        self._reset_auth_token()
+        self.initial_auth_done = False
+        self._ensure_initial_auth()
+        messagebox.showinfo(
+            "YouTube-Authentifizierung",
+            "Neuer Login gestartet. Bitte Auth im Browser abschließen."
+        )
+
+    def _reset_auth_token(self):
+        """Löscht gespeicherten OAuth-Token, um neuen Login zu erzwingen."""
+        try:
+            token_path = Path(TOKEN_PATH)
+            if token_path.exists():
+                token_path.unlink()
+        except Exception as e:
+            print(f"⚠ Token konnte nicht gelöscht werden: {e}")
+
     def _initial_auth_worker(self):
         """Führt initiale Authentifizierung im Hintergrund aus."""
         self.root.after(
             0,
             lambda: self._set_status_message("Prüfe YouTube-Authentifizierung...", "orange")
         )
+        self.root.after(0, lambda: self.auth_button.config(state=DISABLED))
 
         try:
-            create_youtube_client(CLIENT_SECRETS_PATH, TOKEN_PATH)
+            create_youtube_client(
+                CLIENT_SECRETS_PATH,
+                TOKEN_PATH,
+                auth_prompt_callback=self._notify_auth_flow
+            )
             self.initial_auth_done = True
             self.root.after(
                 0,
                 lambda: self._set_status_message("YouTube-Authentifizierung bereit.", "green")
             )
+            self.root.after(0, self._close_auth_popup)
         except AuthError as e:
             self.root.after(
                 0,
@@ -776,13 +826,74 @@ class BatchUploadApp:
                 0,
                 lambda: self._set_status_message("Auth fehlgeschlagen – bitte erneut versuchen.", "red")
             )
+            self.root.after(0, self._close_auth_popup)
         finally:
             self.auth_check_running = False
+            self.root.after(0, lambda: self.auth_button.config(state=NORMAL))
 
     def _set_status_message(self, text: str, color: str = "blue"):
         """Aktualisiert globale Statusanzeige."""
         if hasattr(self, "status_label"):
             self.status_label.config(text=text, foreground=color)
+
+    def _notify_auth_flow(self, auth_url: str):
+        """Zeigt Popup-Hinweis während des OAuth-Logins."""
+        # Stelle sicher, dass UI-Änderungen im Mainloop passieren
+        self.root.after(0, lambda: self._set_status_message("Browser geöffnet – bitte Login abschließen.", "red"))
+        self.root.after(0, lambda: self._show_auth_popup(auth_url))
+
+    def _show_auth_popup(self, auth_url: str):
+        """Popup mit rotem Hinweis und Button zum Browser."""
+        if self.auth_popup and self.auth_popup.winfo_exists():
+            self.auth_popup.lift()
+            return
+
+        popup = tk.Toplevel(self.root)
+        popup.title("YouTube-Authentifizierung")
+        popup.attributes("-topmost", True)
+        popup.geometry("420x150")
+        popup.resizable(False, False)
+        popup.transient(self.root)
+
+        self.auth_popup = popup
+
+        container = ttk.Frame(popup, padding=15)
+        container.pack(fill=BOTH, expand=YES)
+
+        label = ttk.Label(
+            container,
+            text="Bitte Authentifizierung im Browser abschließen.",
+            foreground="red",
+            font=(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, "bold"),
+            wraplength=380,
+            justify="center"
+        )
+        label.pack(pady=(0, 10))
+
+        def open_browser():
+            self._open_in_browser(auth_url)
+            popup.lift()
+
+        # Öffne Browser automatisch einmalig, damit Nutzer nicht hängenbleibt
+        self.root.after(100, open_browser)
+
+        action_btn = ttk.Button(
+            container,
+            text="Browser öffnen",
+            bootstyle=DANGER,
+            command=open_browser,
+            width=20
+        )
+        action_btn.pack()
+
+        # Klick auf den Text öffnet ebenfalls den Browser
+        label.bind("<Button-1>", lambda _: open_browser())
+
+    def _close_auth_popup(self):
+        """Schließt Auth-Popup falls offen."""
+        if self.auth_popup and self.auth_popup.winfo_exists():
+            self.auth_popup.destroy()
+            self.auth_popup = None
 
     def _open_asset_manager(self):
         """Öffnet separates Fenster mit bereits hochgeladenen Videos."""
@@ -907,30 +1018,20 @@ class BatchUploadApp:
             self._update_upload_button_state()
 
     def _select_directories(self, base_dir: str = None) -> List[str]:
-        """Erlaubt Auswahl mehrerer Ordner (wiederholter Dialog)."""
-        selected = []
+        """Erlaubt Auswahl genau eines Ordners (Dialog schließt danach)."""
         initial_dir = base_dir or self.last_directory_selection or str(Path.home())
 
-        while True:
-            directory = filedialog.askdirectory(
-                title="Ordner mit Video-Dateien auswählen",
-                initialdir=initial_dir,
-                mustexist=True
-            )
-            if not directory:
-                break
+        directory = filedialog.askdirectory(
+            title="Ordner mit Video-Dateien auswählen",
+            initialdir=initial_dir,
+            mustexist=True
+        )
 
-            selected.append(directory)
-            initial_dir = directory
-            self.last_directory_selection = directory
+        if not directory:
+            return []
 
-            if not messagebox.askyesno(
-                "Weitere Ordner?",
-                "Möchtest du einen weiteren Ordner hinzufügen?"
-            ):
-                break
-
-        return selected
+        self.last_directory_selection = directory
+        return [directory]
 
     def _add_video_from_directory(self, directory: str) -> bool:
         """Fügt neuestes Video eines Ordners hinzu."""
@@ -1187,6 +1288,7 @@ class BatchUploadApp:
             )
             return
 
+        # Stelle sicher, dass OAuth bereit ist
         if not self.initial_auth_done:
             self._ensure_initial_auth()
             messagebox.showinfo(
@@ -1290,7 +1392,8 @@ class BatchUploadApp:
 
                     # Prüfe ob Video mit gleichem Titel bereits existiert
                     title = factsheet_with_thumbnail.get("snippet", {}).get("title", "")
-                    if title:
+                    prevent_duplicates = profile_data.get("prevent_duplicates", True)
+                    if title and prevent_duplicates:
                         try:
                             existing_video = find_video_by_title(title)
                             if existing_video:

@@ -8,7 +8,7 @@ import pickle
 import shutil
 import webbrowser
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Callable
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -32,15 +32,22 @@ class AuthError(Exception):
 class YouTubeAuth:
     """Verwaltet YouTube OAuth2-Authentifizierung."""
 
-    def __init__(self, client_secrets_path: str, token_path: str):
+    def __init__(
+        self,
+        client_secrets_path: str,
+        token_path: str,
+        auth_prompt_callback: Optional[Callable[[str], None]] = None
+    ):
         """
         Args:
             client_secrets_path: Pfad zur client_secrets.json
             token_path: Pfad zur Token-Datei (wird erstellt)
+            auth_prompt_callback: Optionaler Callback, erhält den OAuth-URL für UI-Hinweise
         """
         self.client_secrets_path = Path(client_secrets_path)
         self.token_path = Path(token_path)
         self.credentials: Optional[Credentials] = None
+        self.auth_prompt_callback = auth_prompt_callback
 
     def authenticate(self) -> Credentials:
         """
@@ -116,11 +123,22 @@ class YouTubeAuth:
                 SCOPES
             )
 
+            auth_url = None
+            if self.auth_prompt_callback:
+                # Hole OAuth-URL (Redirect wird vom Flow gesetzt)
+                auth_url, _ = flow.authorization_url(
+                    prompt='consent',
+                    access_type='offline',
+                    include_granted_scopes='true'
+                )
+                self.auth_prompt_callback(auth_url)
+
             # Starte lokalen Server für OAuth-Callback
             self.credentials = flow.run_local_server(
                 port=8080,
                 prompt='consent',
-                success_message='Authentifizierung erfolgreich! Du kannst dieses Fenster schließen.'
+                success_message='Authentifizierung erfolgreich! Du kannst dieses Fenster schließen.',
+                open_browser=True
             )
 
             # Speichere Token für zukünftige Verwendung
@@ -192,13 +210,18 @@ class YouTubeAuth:
             raise AuthError(f"YouTube-Client konnte nicht erstellt werden: {str(e)}")
 
 
-def create_youtube_client(client_secrets_path: str, token_path: str):
+def create_youtube_client(
+    client_secrets_path: str,
+    token_path: str,
+    auth_prompt_callback: Optional[Callable[[str], None]] = None
+):
     """
     Hilfsfunktion zum Erstellen eines authentifizierten YouTube-Clients.
 
     Args:
         client_secrets_path: Pfad zur client_secrets.json
         token_path: Pfad zur Token-Datei
+        auth_prompt_callback: Optionaler Callback für UI-Hinweise (z.B. Popup)
 
     Returns:
         YouTube API Resource
@@ -206,5 +229,9 @@ def create_youtube_client(client_secrets_path: str, token_path: str):
     Raises:
         AuthError: Bei Authentifizierungsfehlern
     """
-    auth = YouTubeAuth(client_secrets_path, token_path)
+    auth = YouTubeAuth(
+        client_secrets_path,
+        token_path,
+        auth_prompt_callback=auth_prompt_callback
+    )
     return auth.get_youtube_client()
