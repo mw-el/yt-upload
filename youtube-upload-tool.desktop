@@ -1,12 +1,17 @@
 [Desktop Entry]
-Version=1.0
 Type=Application
 Name=YouTube Upload Tool
-Comment=Multi-Profile Batch Upload für YouTube Videos
+GenericName=YouTube Uploader
+Comment=Multi-Profile Batch Upload for YouTube Videos
 Exec=/home/matthias/_AA_YT_Upl/start_desktop.sh
 Icon=/home/matthias/_AA_YT_Upl/YT_upl.png
 Terminal=false
-Categories=AudioVideo;Video;
-Keywords=youtube;upload;video;batch;
+Categories=AudioVideo;Video;Network;
+Keywords=youtube;upload;video;batch;profiles;
 StartupNotify=true
 StartupWMClass=YouTubeUploadTool
+Actions=Quit;
+
+[Desktop Action Quit]
+Name=Quit YouTube Upload Tool
+Exec=pkill -f "python.*main.py"
