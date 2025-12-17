@@ -6,6 +6,7 @@ Verwaltet Credentials, Token-Refresh und API-Client-Erstellung.
 import os
 import pickle
 import shutil
+import socket
 import webbrowser
 from pathlib import Path
 from typing import Optional, Callable
@@ -101,6 +102,36 @@ class YouTubeAuth:
         # Starte OAuth2-Flow (Browser öffnet sich)
         return self._run_oauth_flow()
 
+    def _find_free_port(self, start_port: int = 8081, max_attempts: int = 10) -> int:
+        """
+        Findet einen freien Port für den OAuth-Callback-Server.
+
+        Args:
+            start_port: Startport (default 8081)
+            max_attempts: Maximale Anzahl Versuche
+
+        Returns:
+            Freier Port
+
+        Raises:
+            AuthError: Wenn kein freier Port gefunden wurde
+        """
+        for port in range(start_port, start_port + max_attempts):
+            try:
+                # Versuche, einen Socket auf diesem Port zu binden
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('localhost', port))
+                    print(f"    ✓ Port {port} ist frei, wird verwendet")
+                    return port
+            except OSError:
+                # Port ist belegt, nächsten versuchen
+                continue
+
+        raise AuthError(
+            f"Kein freier Port gefunden (versucht: {start_port}-{start_port + max_attempts - 1}). "
+            f"Bitte schließe andere Anwendungen oder starte den Rechner neu."
+        )
+
     def _run_oauth_flow(self) -> Credentials:
         """
         Startet OAuth2-Flow im Browser.
@@ -133,9 +164,12 @@ class YouTubeAuth:
                 )
                 self.auth_prompt_callback(auth_url)
 
+            # Finde einen freien Port (8081-8090)
+            free_port = self._find_free_port(start_port=8081, max_attempts=10)
+
             # Starte lokalen Server für OAuth-Callback
             self.credentials = flow.run_local_server(
-                port=8080,
+                port=free_port,
                 prompt='consent',
                 success_message='Authentifizierung erfolgreich! Du kannst dieses Fenster schließen.',
                 open_browser=True
